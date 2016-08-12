@@ -227,7 +227,7 @@ def main(args):
         parser.add_argument("-s", action="store", dest="assignments", required=False, type=int, default=100)
         parser.add_argument("-n", action="store", dest="n_aligns", required=False, type=int, default=400)
         parser.add_argument("-e", action="store", dest="n_test_alns", required=False, type=int, default=400)
-        parser.add_argument("-t", action="store", dest="assignment_threshold", required=False, type=float, default=0.3)
+        parser.add_argument("-t", action="store", dest="assignment_threshold", required=False, type=float, default=0.8)
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
         args = parser.parse_args()
         return args
