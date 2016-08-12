@@ -59,7 +59,12 @@ def make_gatc_motif_file(fasta, outfile):
 
 
 def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, motif_file, t_model, c_model,
-                        outpath, n):
+                        outpath, n, ccwgg_positions=None, ccwgg_motif=None):
+    if ccwgg_positions is not None and ccwgg_motif is not None:
+        ccwgg_flag = True
+    else:
+        ccwgg_flag = False
+
     working_path = os.path.abspath(outpath)
     commands = []
     c = PATH_TO_BINS + "runSignalAlign -d={reads} -r={fasta} -T={tModel} -C={cModel} -f=assignments " \
@@ -72,14 +77,20 @@ def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, m
     assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
     assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
 
+    total_jobs = int(jobs / 3) if ccwgg_flag else int(jobs / 2)
+
     for reads, label, working_directory in zip(read_sets, labels, working_directories):
         # assemble the command
         command = c.format(reads=reads, fasta=fasta, tModel=t_model, cModel=c_model, outpath=working_directory,
-                           positions=positions_file, targetFile=motif_file, sub=label, n=n, jobs=int(jobs/2))
+                           positions=positions_file, targetFile=motif_file, sub=label, n=n, jobs=total_jobs)
         commands.append(command)
+
     os.chdir(PATH_TO_BINS)
     procs = [Popen(x.split(), stdout=sys.stdout, stderr=sys.stderr) for x in commands]
     status = [p.wait() for p in procs]
+
+
+
     os.chdir(working_path)
     working_directories = [d + "tempFiles_alignment/*.assignments" for d in working_directories]
 
@@ -220,6 +231,10 @@ def main(args):
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
         args = parser.parse_args()
         return args
+
+    command_line = " ".join(sys.argv[:])
+    print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
+
     args = parse_args()
 
     # make the positions and motif file
