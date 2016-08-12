@@ -231,18 +231,18 @@ def main(args):
                      outpath=working_path,
                      samples=args.samples)
     # train HMM/HDP
-    models = train_model_transitions(fasta=os.path.abspath(args.reference),
-                                     pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                                     genomic_reads=os.path.abspath(args.genomic_reads) + "/",
-                                     jobs=args.jobs,
-                                     positions_file=positions_file,
-                                     iterations=args.iterations,
-                                     batch_size=args.batch,
-                                     outpath=working_path,
-                                     stateMachine="threeStateHdp",
-                                     t_hdp=hdps[0],
-                                     c_hdp=hdps[1],
-                                     )
+    _ = train_model_transitions(fasta=os.path.abspath(args.reference),
+                                pcr_reads=os.path.abspath(args.pcr_reads) + "/",
+                                genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                jobs=args.jobs,
+                                positions_file=positions_file,
+                                iterations=args.iterations,
+                                batch_size=args.batch,
+                                outpath=working_path,
+                                stateMachine="threeStateHdp",
+                                t_hdp=hdps[0],
+                                c_hdp=hdps[1],
+                                )
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
