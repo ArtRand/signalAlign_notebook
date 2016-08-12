@@ -86,6 +86,34 @@ def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, m
     return working_directories
 
 
+def run_variant_calling_experiment(fasta, pcr_reads, genomic_reads, jobs, positions_file, motif_file, t_model, c_model,
+                                  outpath, n, degenerate, t_hdp, c_hdp):
+    working_path = os.path.abspath(outpath)
+    commands = []
+    c = PATH_TO_BINS + "runSignalAlign -d={reads} -r={fasta} -T={tModel} -C={cModel} -f=variantCaller " \
+                       "-o={outpath} -p={positions} -q={targetFile} -n={n} -j={jobs} -x={degenerate} " \
+                       "-tH={tHdp} -cH={cHdp} -smt=threeStateHdp"
+    read_sets = [pcr_reads, genomic_reads]
+    working_directories = [working_path + "/vc_pcr_", working_path + "/vc_genomic_"]
+
+    assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
+    assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
+    assert os.path.exists(t_hdp), "Didn't find template model, looked {}".format(t_hdp)
+    assert os.path.exists(c_hdp), "Didn't find complement model, looked {}".format(c_hdp)
+
+    for reads, working_directory in zip(read_sets, working_directories):
+        # assemble the command
+        command = c.format(reads=reads, fasta=fasta, tModel=t_model, cModel=c_model, outpath=working_directory,
+                           positions=positions_file, targetFile=motif_file, n=n, jobs=int(jobs/2), tHdp=t_hdp,
+                           cHdp=c_hdp)
+        commands.append(command)
+
+    os.chdir(PATH_TO_BINS)
+    procs = [Popen(x.split(), stdout=sys.stdout, stderr=sys.stderr) for x in commands]
+    status = [p.wait() for p in procs]
+    os.chdir(working_path)
+    return
+
 def make_master_assignment_table(assignment_directories):
     def parse_assignment_file(file):
         data = pd.read_table(file,
@@ -126,6 +154,9 @@ def train_model_transitions(fasta, pcr_reads, genomic_reads, jobs, positions_fil
     os.system(c)
     models = [model_directory + "tempFiles_expectations/template_trained.hmm",
               model_directory + "tempFiles_expectations/complement_trained.hmm"]
+    if t_hdp is not None and c_hdp is not None:
+        models.append(model_directory + "tempFiles_expectations/template.singleLevelPriorEcoli.nhdp")
+        models.append(model_directory + "tempFiles_expectations/complement.singleLevelPriorEcoli.nhdp")
     os.chdir(working_path)
     return models
 
@@ -166,8 +197,8 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
     c = PATH_TO_BINS + c
     os.system(c)
     os.chdir(outpath)
-    return [hdp_pipeline_dir + "template.multisetPriorEcoli.nhdp",
-            hdp_pipeline_dir + "complement.multisetPriorEcoli.nhdp"]
+    return [hdp_pipeline_dir + "template.singleLevelPriorEcoli.nhdp",
+            hdp_pipeline_dir + "complement.singleLevelPriorEcoli.nhdp"]
 
 
 def main(args):
@@ -182,6 +213,7 @@ def main(args):
         parser.add_argument("-a", action="store", dest="batch", required=False, type=int, default=15000)
         parser.add_argument("-s", action="store", dest="assignments", required=False, type=int, default=100)
         parser.add_argument("-n", action="store", dest="n_aligns", required=False, type=int, default=400)
+        parser.add_argument("-e", action="store", dest="n_test_alns", required=False, type=int, default=400)
         parser.add_argument("-t", action="store", dest="assignment_threshold", required=False, type=float, default=0.3)
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
         args = parser.parse_args()
@@ -205,7 +237,6 @@ def main(args):
                                      batch_size=args.batch,
                                      outpath=working_path,
                                      )
-
     # do the initial alignments
     assignment_dirs = run_guide_alignment(fasta=os.path.abspath(args.reference),
                                           pcr_reads=os.path.abspath(args.pcr_reads) + "/",
@@ -231,18 +262,32 @@ def main(args):
                      outpath=working_path,
                      samples=args.samples)
     # train HMM/HDP
-    _ = train_model_transitions(fasta=os.path.abspath(args.reference),
-                                pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                                genomic_reads=os.path.abspath(args.genomic_reads) + "/",
-                                jobs=args.jobs,
-                                positions_file=positions_file,
-                                iterations=args.iterations,
-                                batch_size=args.batch,
-                                outpath=working_path,
-                                stateMachine="threeStateHdp",
-                                t_hdp=hdps[0],
-                                c_hdp=hdps[1],
-                                )
+    hdp_models = train_model_transitions(fasta=os.path.abspath(args.reference),
+                                         pcr_reads=os.path.abspath(args.pcr_reads) + "/",
+                                         genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                         jobs=args.jobs,
+                                         positions_file=positions_file,
+                                         iterations=args.iterations,
+                                         batch_size=args.batch,
+                                         outpath=working_path,
+                                         stateMachine="threeStateHdp",
+                                         t_hdp=hdps[0],
+                                         c_hdp=hdps[1],
+                                         )
+    # run methylation variant calling experiment
+    run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
+                                   pcr_reads=os.path.abspath(args.pcr_reads) + "/",
+                                   genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                   jobs=args.jobs,
+                                   positions_file=positions_file,
+                                   motif_file=motif_file,
+                                   t_model=hdp_models[0],
+                                   c_model=hdp_models[1],
+                                   outpath=working_path,
+                                   n=args.n_test_alns,
+                                   degenerate="adenosine",
+                                   t_hdp=hdp_models[2],
+                                   c_hdp=hdp_models[3])
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
