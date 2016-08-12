@@ -105,7 +105,7 @@ def run_variant_calling_experiment(fasta, pcr_reads, genomic_reads, jobs, positi
         # assemble the command
         command = c.format(reads=reads, fasta=fasta, tModel=t_model, cModel=c_model, outpath=working_directory,
                            positions=positions_file, targetFile=motif_file, n=n, jobs=int(jobs/2), tHdp=t_hdp,
-                           cHdp=c_hdp)
+                           cHdp=c_hdp, degenerate=degenerate)
         commands.append(command)
 
     os.chdir(PATH_TO_BINS)
