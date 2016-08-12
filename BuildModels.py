@@ -94,7 +94,8 @@ def run_variant_calling_experiment(fasta, pcr_reads, genomic_reads, jobs, positi
                        "-o={outpath} -p={positions} -q={targetFile} -n={n} -j={jobs} -x={degenerate} " \
                        "-tH={tHdp} -cH={cHdp} -smt=threeStateHdp"
     read_sets = [pcr_reads, genomic_reads]
-    working_directories = [working_path + "/vc_pcr_", working_path + "/vc_genomic_"]
+    working_directories = [working_path + "/{}_pcr_".format(degenerate),
+                           working_path + "/{}_genomic_".format(degenerate)]
 
     assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
     assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
@@ -113,6 +114,7 @@ def run_variant_calling_experiment(fasta, pcr_reads, genomic_reads, jobs, positi
     status = [p.wait() for p in procs]
     os.chdir(working_path)
     return
+
 
 def make_master_assignment_table(assignment_directories):
     def parse_assignment_file(file):
@@ -272,8 +274,7 @@ def main(args):
                                          outpath=working_path,
                                          stateMachine="threeStateHdp",
                                          t_hdp=hdps[0],
-                                         c_hdp=hdps[1],
-                                         )
+                                         c_hdp=hdps[1])
     # run methylation variant calling experiment
     run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
                                    pcr_reads=os.path.abspath(args.pcr_reads) + "/",
@@ -286,6 +287,19 @@ def main(args):
                                    outpath=working_path,
                                    n=args.n_test_alns,
                                    degenerate="adenosine",
+                                   t_hdp=hdp_models[2],
+                                   c_hdp=hdp_models[3])
+    run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
+                                   pcr_reads=os.path.abspath(args.pcr_reads) + "/",
+                                   genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                   jobs=args.jobs,
+                                   positions_file=positions_file,
+                                   motif_file=motif_file,
+                                   t_model=hdp_models[0],
+                                   c_model=hdp_models[1],
+                                   outpath=working_path,
+                                   n=args.n_test_alns,
+                                   degenerate="variant",
                                    t_hdp=hdp_models[2],
                                    c_hdp=hdp_models[3])
 
