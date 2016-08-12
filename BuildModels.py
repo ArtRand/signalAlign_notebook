@@ -204,7 +204,7 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
     os.makedirs(hdp_pipeline_dir)
     os.chdir(PATH_TO_BINS)
     c = "hdp_pipeline --build_alignment={build} -tM={tModel} -cM={cModel} -Ba=1 -Bb=1 -Ma=1 -Mb=1 -La=1 -Lb=1 " \
-        "-s={samples} --verbose --grid_start=60 --grid_end=130 --grid_length=1400 --verbose -o={out} " \
+        "-s={samples} --verbose --grid_start=50 --grid_end=140 --grid_length=1800 --verbose -o={out} " \
         "--hdp_type=ecoli".format(build=build_alignment, tModel=t_model, cModel=c_model, samples=samples,
                                   out=hdp_pipeline_dir)
     c = PATH_TO_BINS + c
