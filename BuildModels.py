@@ -204,8 +204,8 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, num_as
     if degenerate == "adenosine":
         kmers += motif_kmers(core="GITC", kmer_length=kmer_length)
     else:
-        kmers += motif_kmers(core="CCAGG", kmer_length=kmer_length)
-        kmers += motif_kmers(core="CCTGG", kmer_length=kmer_length)
+        kmers += motif_kmers(core="CEAGG", kmer_length=kmer_length)
+        kmers += motif_kmers(core="CETGG", kmer_length=kmer_length)
     fH = open(outfile, "w")
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
     for strand in ["t", "c"]:
