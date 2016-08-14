@@ -64,21 +64,31 @@ def check_starts(starts, seq, target):
     return True
 
 
-def make_CCGG_substitute_file(starts, seq, out_file):
+def find_ccwgg_motifs(seq):
+    motifs = ["CCAGG", "CCTGG"]
+    motif_length = len(motifs[0])
+    for i, _ in enumerate(seq):
+        if seq[i:i + motif_length] in motifs:
+            yield i + 1  # + 1 because we want to label the second C in CCWGG
+
+
+def make_CCWGG_positions_file(fasta, out_file):
     def check_starts(starts, seq, target):
         for start in starts:
             assert seq[start] == target
         return True
+
     if os.path.exists(out_file):
         print "Outfile you're trying to make already exists"
         return
+    seq = get_first_seq(fasta)
+    starts = [x for x in find_ccwgg_motifs(seq)]
     fH = open(out_file, 'w')
     if check_starts(starts, seq, "C"):
         fH.write("X\t")
         for start in starts:
             fH.write("{}\t".format(start))
     fH.write("\n")
-
     # + 2 because the starts are for the second C in CCWGG and on the complement we want to mark the the C in the motif
     rc_starts = [x + 2 for x in starts]
     if check_starts(rc_starts, seq, "G"):
@@ -87,6 +97,7 @@ def make_CCGG_substitute_file(starts, seq, out_file):
             fH.write("{}\t".format(start))
     fH.write("\n")
     fH.close()
+    return out_file
 
 
 # this function just marks all of the base pairs in starts

@@ -8,18 +8,38 @@ import numpy as np
 from argparse import ArgumentParser
 from subprocess import Popen
 from itertools import product
-from commonFunctions import get_first_seq, make_motif_file, get_all_sequence_kmers
+from commonFunctions import get_first_seq, make_motif_file, get_all_sequence_kmers, make_CCWGG_positions_file, \
+    find_ccwgg_motifs
 
 PATH_TO_SIGNALALIGN = os.path.abspath("../signalAlign/")
 PATH_TO_BINS = PATH_TO_SIGNALALIGN + "/bin/"
 
+def kmer_length_from_model(model_file):
+    with open(model_file, "r") as model:
+        line = model.readline().split()
+        kmer_length = int(line[-1])
+        model.close()
+    assert kmer_length == 5 or kmer_length == 6
+    return kmer_length
 
-def gatc_motifs(core="GITC"):
+def make_positions_file(fasta, degenerate, outfile):
+    if degenerate == "adenosine":
+        return make_gatc_position_file(fasta, outfile)
+    else:
+        return make_CCWGG_positions_file(fasta, outfile)
+
+
+def motif_kmers(core, kmer_length=5):
     motifs = []
-    for _ in product("ACGT", repeat=1):
-        motifs.append(_[0] + core)
-        motifs.append(core + _[0])
-    return motifs
+    repeat = kmer_length - len(core)
+    if repeat == 0:
+        return [core]
+    else:
+        for _ in product("ACGT", repeat=repeat):
+            fix = ''.join(_)
+            motifs.append(fix + core)
+            motifs.append(core + fix)
+        return motifs
 
 
 def find_gatc_motifs(sequence):
@@ -50,46 +70,47 @@ def make_gatc_position_file(fasta, outfile):
     return outfile
 
 
-def make_gatc_motif_file(fasta, outfile):
+def make_gatc_or_ccwgg_motif_file(fasta, degenerate, outfile):
+    if degenerate == "adenosine":
+        motif_finder = find_gatc_motifs
+    else:
+        motif_finder = find_ccwgg_motifs
     outfile = os.path.abspath(outfile)
     seq = get_first_seq(fasta)
-    gatcs = [x for x in find_gatc_motifs(seq)]
-    make_motif_file(gatcs, seq, outfile)
+    positions = [x for x in motif_finder(seq)]
+    make_motif_file(positions, seq, outfile)
     return outfile
 
 
 def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, motif_file, t_model, c_model,
-                        outpath, n, ccwgg_positions=None, ccwgg_motif=None):
-    if ccwgg_positions is not None and ccwgg_motif is not None:
-        ccwgg_flag = True
-    else:
-        ccwgg_flag = False
+                        outpath, n, degenerate):
+    def get_labels():
+        if degenerate == "adenosine":
+            return ["A", "I"]
+        else:
+            return ["C", "E"]
 
     working_path = os.path.abspath(outpath)
     commands = []
     c = PATH_TO_BINS + "runSignalAlign -d={reads} -r={fasta} -T={tModel} -C={cModel} -f=assignments " \
-                              "-o={outpath} -p={positions} -q={targetFile} -X={sub} -n={n} -j={jobs}"
+                       "-o={outpath} -p={positions} -q={targetFile} -X={sub} -n={n} -j={jobs}"
 
     read_sets = [pcr_reads, genomic_reads]
-    labels = ["A", "I"]
+    labels = get_labels()
     working_directories = [working_path + "/pcr_", working_path + "/genomic_"]
 
     assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
     assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
 
-    total_jobs = int(jobs / 3) if ccwgg_flag else int(jobs / 2)
-
     for reads, label, working_directory in zip(read_sets, labels, working_directories):
         # assemble the command
         command = c.format(reads=reads, fasta=fasta, tModel=t_model, cModel=c_model, outpath=working_directory,
-                           positions=positions_file, targetFile=motif_file, sub=label, n=n, jobs=total_jobs)
+                           positions=positions_file, targetFile=motif_file, sub=label, n=n, jobs=int(jobs/2))
         commands.append(command)
 
     os.chdir(PATH_TO_BINS)
     procs = [Popen(x.split(), stdout=sys.stdout, stderr=sys.stderr) for x in commands]
     status = [p.wait() for p in procs]
-
-
 
     os.chdir(working_path)
     working_directories = [d + "tempFiles_alignment/*.assignments" for d in working_directories]
@@ -146,20 +167,23 @@ def make_master_assignment_table(assignment_directories):
     return pd.concat(assignment_dfs)
 
 
-def train_model_transitions(fasta, pcr_reads, genomic_reads, jobs, positions_file, iterations, batch_size, outpath,
-                            stateMachine="threeState", t_hdp=None, c_hdp=None):
+def train_model_transitions(fasta, pcr_reads, genomic_reads, degenerate, jobs, positions_file, iterations, batch_size,
+                            outpath, t_model, c_model, stateMachine="threeState", t_hdp=None, c_hdp=None):
     working_path = os.path.abspath(outpath) + "/"
     model_directory = working_path + "{}_".format(stateMachine)
-    t_model = PATH_TO_SIGNALALIGN + "/models/testModelR9_5mer_acegit_template.model"
-    c_model = PATH_TO_SIGNALALIGN + "/models/testModelR9_5mer_acegit_complement.model"
-    assert os.path.exists(t_model), "Didn't find template model"
-    assert os.path.exists(c_model), "Didn't find complement model"
+    assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
+    assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
+
+    if degenerate == "adenosine":
+        methyl_char = "I"
+    else:
+        methyl_char = "E"
 
     os.chdir(PATH_TO_BINS)
-    c = "trainModels -d={pcr} -d={genomic} -X=C -X=I -r={fasta} -i={iter} -a={batch} --transitions -smt={smt} " \
-        "-T={tModel} -C={cModel} -j={jobs} -x=adenosine -p={positions} -o={out} " \
+    c = "trainModels -d={pcr} -d={genomic} -X=C -X={methylChar} -r={fasta} -i={iter} -a={batch} --transitions " \
+        "-smt={smt} -T={tModel} -C={cModel} -j={jobs} -x=adenosine -p={positions} -o={out} " \
         "".format(pcr=pcr_reads, genomic=genomic_reads, fasta=fasta, iter=iterations, batch=batch_size,
-                  smt=stateMachine, tModel=t_model, cModel=c_model, jobs=jobs,
+                  smt=stateMachine, tModel=t_model, cModel=c_model, jobs=jobs, methylChar=methyl_char,
                   positions=positions_file, out=model_directory)
     if t_hdp is not None and c_hdp is not None:
         c += "-tH={tHdp} -cH={cHdp} ".format(tHdp=os.path.abspath(t_hdp), cHdp=os.path.abspath(c_hdp))
@@ -174,16 +198,23 @@ def train_model_transitions(fasta, pcr_reads, genomic_reads, jobs, positions_fil
     return models
 
 
-def make_build_alignment(assignments, ref_fasta, num_assignments, outfile, threshold=0.1):
+def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, num_assignments, outfile, threshold=0.1):
     seq = get_first_seq(ref_fasta)
-    kmers = get_all_sequence_kmers(seq, 5).keys()
-    kmers += gatc_motifs("GITC")
+    kmers = get_all_sequence_kmers(seq, kmer_length).keys()
+    if degenerate == "adenosine":
+        kmers += motif_kmers(core="GITC", kmer_length=kmer_length)
+    else:
+        kmers += motif_kmers(core="CCAGG", kmer_length=kmer_length)
+        kmers += motif_kmers(core="CCTGG", kmer_length=kmer_length)
     fH = open(outfile, "w")
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
     for strand in ["t", "c"]:
         by_stand = assignments.ix[(assignments['strand'] == strand) & (assignments['prob'] >= threshold)]
         for k in kmers:
             kmer_assignments = by_stand.ix[by_stand['kmer'] == k]
+            if kmer_assignments.empty:
+                print("missing kmer {}, continuing".format(k))
+                continue
             kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)
             n = 0
             for _, r in kmer_assignments.iterrows():
@@ -196,6 +227,7 @@ def make_build_alignment(assignments, ref_fasta, num_assignments, outfile, thres
 
 
 def build_hdp(build_alignment_path, template_model, complement_model, outpath, samples=15000):
+    working_path = os.path.abspath(outpath) + "/"
     build_alignment = os.path.abspath(build_alignment_path)
     t_model = os.path.abspath(template_model)
     c_model = os.path.abspath(complement_model)
@@ -209,7 +241,7 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
                                   out=hdp_pipeline_dir)
     c = PATH_TO_BINS + c
     os.system(c)
-    os.chdir(outpath)
+    os.chdir(working_path)
     return [hdp_pipeline_dir + "template.singleLevelPriorEcoli.nhdp",
             hdp_pipeline_dir + "complement.singleLevelPriorEcoli.nhdp"]
 
@@ -220,7 +252,10 @@ def main(args):
         parser.add_argument("-r", action="store", dest="reference", required=True)
         parser.add_argument("-pcr", action="store", dest="pcr_reads", required=True)
         parser.add_argument("-gen", action="store", dest="genomic_reads", required=True)
+        parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm', required=True, type=str)
+        parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm', required=True, type=str)
         parser.add_argument("-o", action="store", dest="outpath", required=True)
+        parser.add_argument("-x", action="store", dest="degenerate", required=True)
         parser.add_argument("-j", action="store", dest="jobs", required=False, default=4, type=int)
         parser.add_argument("-i", action="store", dest="iterations", required=False, type=int, default=20)
         parser.add_argument("-a", action="store", dest="batch", required=False, type=int, default=15000)
@@ -239,21 +274,27 @@ def main(args):
 
     # make the positions and motif file
     working_path = os.path.abspath(args.outpath)
-    positions_file = make_gatc_position_file(args.reference, working_path + "/gatc_positions.positions")
+    positions_file = make_positions_file(fasta=args.reference,
+                                         degenerate=args.degenerate,
+                                         outfile=working_path + "/{}_positions.positions".format(args.degenerate))
 
     # make the motif file
-    motif_file = make_gatc_motif_file(args.reference, working_path + "/gatc_target.target")
+    motif_file = make_gatc_or_ccwgg_motif_file(fasta=args.reference,
+                                               degenerate=args.degenerate,
+                                               outfile=working_path + "/{}_target.target".format(args.degenerate))
 
     # train the transitions
     models = train_model_transitions(fasta=os.path.abspath(args.reference),
                                      pcr_reads=os.path.abspath(args.pcr_reads) + "/",
                                      genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                     degenerate=args.degenerate,
                                      jobs=args.jobs,
                                      positions_file=positions_file,
                                      iterations=args.iterations,
                                      batch_size=args.batch,
                                      outpath=working_path,
-                                     )
+                                     t_model=os.path.abspath(args.in_T_Hmm),
+                                     c_model=os.path.abspath(args.in_C_Hmm))
     # do the initial alignments
     assignment_dirs = run_guide_alignment(fasta=os.path.abspath(args.reference),
                                           pcr_reads=os.path.abspath(args.pcr_reads) + "/",
@@ -262,12 +303,16 @@ def main(args):
                                           positions_file=positions_file,
                                           motif_file=motif_file,
                                           n=args.n_aligns,
+                                          degenerate=args.degenerate,
                                           t_model=models[0],
                                           c_model=models[1],
                                           outpath=working_path)
+    assert kmer_length_from_model(models[0]) == kmer_length_from_model(models[1])
     # concatenate the assignments into table
     master = make_master_assignment_table(assignment_dirs)
     build_alignment = make_build_alignment(assignments=master,
+                                           degenerate=args.degenerate,
+                                           kmer_length=kmer_length_from_model(models[0]),
                                            ref_fasta=os.path.abspath(args.reference),
                                            num_assignments=args.assignments,
                                            outfile=working_path + "/buildAlignment.tsv",
@@ -282,6 +327,7 @@ def main(args):
     hdp_models = train_model_transitions(fasta=os.path.abspath(args.reference),
                                          pcr_reads=os.path.abspath(args.pcr_reads) + "/",
                                          genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                         degenerate=args.degenerate,
                                          jobs=args.jobs,
                                          positions_file=positions_file,
                                          iterations=args.iterations,
@@ -289,7 +335,9 @@ def main(args):
                                          outpath=working_path,
                                          stateMachine="threeStateHdp",
                                          t_hdp=hdps[0],
-                                         c_hdp=hdps[1])
+                                         c_hdp=hdps[1],
+                                         t_model=os.path.abspath(args.in_T_Hmm),
+                                         c_model=os.path.abspath(args.in_C_Hmm))
     # run methylation variant calling experiment
     run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
                                    pcr_reads=os.path.abspath(args.pcr_reads) + "/",
@@ -301,9 +349,10 @@ def main(args):
                                    c_model=hdp_models[1],
                                    outpath=working_path,
                                    n=args.n_test_alns,
-                                   degenerate="adenosine",
+                                   degenerate=args.degenerate,
                                    t_hdp=hdp_models[2],
                                    c_hdp=hdp_models[3])
+    # run the control experiment
     run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
                                    pcr_reads=os.path.abspath(args.pcr_reads) + "/",
                                    genomic_reads=os.path.abspath(args.genomic_reads) + "/",
