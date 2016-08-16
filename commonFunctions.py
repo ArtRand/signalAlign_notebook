@@ -20,6 +20,7 @@ def get_all_sequence_kmers(seq, k=5):
         kmers[kmer] += 1
     return kmers
 
+
 def parse_alignment_file(alignment_file):
     data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
                          dtype={'ref_pos': np.int64,

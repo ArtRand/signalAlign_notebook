@@ -14,6 +14,7 @@ from commonFunctions import get_first_seq, make_motif_file, get_all_sequence_kme
 PATH_TO_SIGNALALIGN = os.path.abspath("../signalAlign/")
 PATH_TO_BINS = PATH_TO_SIGNALALIGN + "/bin/"
 
+
 def kmer_length_from_model(model_file):
     with open(model_file, "r") as model:
         line = model.readline().split()
@@ -22,6 +23,7 @@ def kmer_length_from_model(model_file):
     assert kmer_length == 5 or kmer_length == 6
     return kmer_length
 
+
 def make_positions_file(fasta, degenerate, outfile):
     if degenerate == "adenosine":
         return make_gatc_position_file(fasta, outfile)
@@ -29,17 +31,34 @@ def make_positions_file(fasta, degenerate, outfile):
         return make_CCWGG_positions_file(fasta, outfile)
 
 
-def motif_kmers(core, kmer_length=5):
+def gatc_kmers(kmerlength, multiplier):
+    gatcs = []
+    core = "GITC"
+    repeat = kmerlength - len(core)
+    for k in product("ACGT", repeat=repeat):
+        fix = ''.join(k)
+        gatcs.append(fix + core)
+        gatcs.append(core + fix)
+    if repeat == 1:
+        return gatcs * multiplier
+    else:
+        for n in product("ACGT", repeat=2):
+            fix = ''.join(n)
+            gatcs.append(fix[0] + core + fix[1])
+        return gatcs * multiplier
+
+
+def motif_kmers(core, kmer_length=5, multiplier=5):
     motifs = []
     repeat = kmer_length - len(core)
     if repeat == 0:
-        return [core]
+        return [core] * multiplier
     else:
-        for _ in product("ACGT", repeat=repeat):
-            fix = ''.join(_)
+        for k in product("ACGT", repeat=repeat):
+            fix = ''.join(k)
             motifs.append(fix + core)
             motifs.append(core + fix)
-        return motifs
+        return motifs * multiplier
 
 
 def find_gatc_motifs(sequence):
@@ -202,10 +221,10 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, num_as
     seq = get_first_seq(ref_fasta)
     kmers = get_all_sequence_kmers(seq, kmer_length).keys()
     if degenerate == "adenosine":
-        kmers += motif_kmers(core="GITC", kmer_length=kmer_length)
+        kmers += gatc_kmers(kmerlength=kmer_length, multiplier=5)
     else:
-        kmers += motif_kmers(core="CEAGG", kmer_length=kmer_length)
-        kmers += motif_kmers(core="CETGG", kmer_length=kmer_length)
+        kmers += motif_kmers(core="CEAGG", kmer_length=kmer_length, multiplier=5)
+        kmers += motif_kmers(core="CETGG", kmer_length=kmer_length, multiplier=5)
     fH = open(outfile, "w")
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
     for strand in ["t", "c"]:
@@ -307,7 +326,7 @@ def main(args):
                                           t_model=models[0],
                                           c_model=models[1],
                                           outpath=working_path)
-    assert kmer_length_from_model(models[0]) == kmer_length_from_model(models[1])
+    assert kmer_length_from_model(models[0]) == kmer_length_from_model(models[1]), "Models had different kmer lengths"
     # concatenate the assignments into table
     master = make_master_assignment_table(assignment_dirs)
     build_alignment = make_build_alignment(assignments=master,
