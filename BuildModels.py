@@ -217,30 +217,35 @@ def train_model_transitions(fasta, pcr_reads, genomic_reads, degenerate, jobs, p
     return models
 
 
-def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, num_assignments, outfile, threshold=0.1):
+def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_canonical_assignments,
+                         n_methyl_assignments, outfile, threshold):
+    def write_kmers(max_assignments, kmer_list):
+        for strand in ["t", "c"]:
+            by_stand = assignments.ix[(assignments['strand'] == strand) & (assignments['prob'] >= threshold)]
+            for k in kmer_list:
+                kmer_assignments = by_stand.ix[by_stand['kmer'] == k]
+                if kmer_assignments.empty:
+                    print("missing kmer {}, continuing".format(k))
+                    continue
+                kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)
+                n = 0
+                for _, r in kmer_assignments.iterrows():
+                    fH.write(
+                        entry_line.format(strand=r['strand'], kmer=r['kmer'], event=r['level_mean'], prob=r['prob']))
+                    n += 1
+                    if n >= max_assignments:
+                        break
     seq = get_first_seq(ref_fasta)
-    kmers = get_all_sequence_kmers(seq, kmer_length).keys()
+    sequence_kmers = get_all_sequence_kmers(seq, kmer_length).keys()
     if degenerate == "adenosine":
-        kmers += gatc_kmers(kmerlength=kmer_length, multiplier=5)
+        methyl_kmers = gatc_kmers(kmerlength=kmer_length, multiplier=1)
     else:
-        kmers += motif_kmers(core="CEAGG", kmer_length=kmer_length, multiplier=5)
-        kmers += motif_kmers(core="CETGG", kmer_length=kmer_length, multiplier=5)
+        methyl_kmers = motif_kmers(core="CEAGG", kmer_length=kmer_length, multiplier=1)
+        methyl_kmers += motif_kmers(core="CETGG", kmer_length=kmer_length, multiplier=1)
     fH = open(outfile, "w")
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
-    for strand in ["t", "c"]:
-        by_stand = assignments.ix[(assignments['strand'] == strand) & (assignments['prob'] >= threshold)]
-        for k in kmers:
-            kmer_assignments = by_stand.ix[by_stand['kmer'] == k]
-            if kmer_assignments.empty:
-                print("missing kmer {}, continuing".format(k))
-                continue
-            kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)
-            n = 0
-            for _, r in kmer_assignments.iterrows():
-                fH.write(entry_line.format(strand=r['strand'], kmer=r['kmer'], event=r['level_mean'], prob=r['prob']))
-                n += 1
-                if n >= num_assignments:
-                    break
+    write_kmers(n_canonical_assignments, sequence_kmers)
+    write_kmers(n_methyl_assignments, methyl_kmers)
     fH.close()
     return outfile
 
@@ -278,9 +283,10 @@ def main(args):
         parser.add_argument("-j", action="store", dest="jobs", required=False, default=4, type=int)
         parser.add_argument("-i", action="store", dest="iterations", required=False, type=int, default=20)
         parser.add_argument("-a", action="store", dest="batch", required=False, type=int, default=15000)
-        parser.add_argument("-s", action="store", dest="assignments", required=False, type=int, default=100)
-        parser.add_argument("-n", action="store", dest="n_aligns", required=False, type=int, default=400)
-        parser.add_argument("-e", action="store", dest="n_test_alns", required=False, type=int, default=400)
+        parser.add_argument("-s", action="store", dest="assignments", required=False, type=int, default=30)
+        parser.add_argument("-c", action="store", dest="methyl_assignments", required=False, type=int, default=200)
+        parser.add_argument("-n", action="store", dest="n_aligns", required=False, type=int, default=1000)
+        parser.add_argument("-e", action="store", dest="n_test_alns", required=False, type=int, default=1000)
         parser.add_argument("-t", action="store", dest="assignment_threshold", required=False, type=float, default=0.8)
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
         args = parser.parse_args()
@@ -333,7 +339,8 @@ def main(args):
                                            degenerate=args.degenerate,
                                            kmer_length=kmer_length_from_model(models[0]),
                                            ref_fasta=os.path.abspath(args.reference),
-                                           num_assignments=args.assignments,
+                                           n_canonical_assignments=args.assignments,
+                                           n_methyl_assignments=args.methyl_assignments,
                                            outfile=working_path + "/buildAlignment.tsv",
                                            threshold=args.assignment_threshold)
     # build hdp
