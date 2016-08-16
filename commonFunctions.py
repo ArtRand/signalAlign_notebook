@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 from serviceCourse.parsers import read_fasta
+from serviceCourse.sequenceTools import reverse_complement
+
 
 def kmer_iterator(dna, k):
     for i in xrange(len(dna)):
@@ -18,6 +20,7 @@ def get_all_sequence_kmers(seq, k=5):
     kmers = Counter()
     for kmer in kmer_iterator(seq, k):
         kmers[kmer] += 1
+        kmers[reverse_complement(kmer, reverse=True, complement=True)] += 1
     return kmers
 
 

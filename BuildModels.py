@@ -235,6 +235,9 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
                     n += 1
                     if n >= max_assignments:
                         break
+                if n < max_assignments:
+                    print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
+                          "".format(max=max_assignments, kmer=k, found=n))
     seq = get_first_seq(ref_fasta)
     sequence_kmers = get_all_sequence_kmers(seq, kmer_length).keys()
     if degenerate == "adenosine":
