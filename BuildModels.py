@@ -31,21 +31,137 @@ def make_positions_file(fasta, degenerate, outfile):
         return make_CCWGG_positions_file(fasta, outfile)
 
 
-def gatc_kmers(kmerlength, multiplier):
-    gatcs = []
-    core = "GITC"
-    repeat = kmerlength - len(core)
-    for k in product("ACGT", repeat=repeat):
-        fix = ''.join(k)
-        gatcs.append(fix + core)
-        gatcs.append(core + fix)
-    if repeat == 1:
-        return gatcs * multiplier
-    else:
-        for n in product("ACGT", repeat=2):
-            fix = ''.join(n)
-            gatcs.append(fix[0] + core + fix[1])
-        return gatcs * multiplier
+def gatc_kmers(sequence_kmers, kmerlength):
+    assert kmerlength == 5 or kmerlength == 6, "only works with kmer lengths 5 and 6"
+    # NNNNGATCNNN
+    methyl_core = "GITC"
+    normal_core = "GATC"
+    nucleotides = "ACGT"
+
+    fourmers = [''.join(x) for x in product(nucleotides, repeat=4)]
+    threemers = [''.join(x) for x in product(nucleotides, repeat=3)]
+    twomers = [''.join(x) for x in product(nucleotides, repeat=2)]
+
+    labeled_kmers = []
+
+    # add NNNNGA*
+    if kmerlength == 6:
+        for fourmer in fourmers:
+            labeled_kmer = (fourmer + methyl_core)[:kmerlength]
+            normal_kmer = (fourmer + normal_core)[:kmerlength]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+    # add NNNGA*T and NNNGA*
+    for threemer in threemers:
+        labeled_kmer = (threemer + methyl_core)[:kmerlength]
+        normal_kmer = (threemer + normal_core)[:kmerlength]
+        if normal_kmer in sequence_kmers:
+            labeled_kmers.append(labeled_kmer)
+        # A*TCNNN
+        if kmerlength == 6:
+            labeled_kmer = (methyl_core + threemer)[1:]
+            normal_kmer = (normal_core + threemer)[1:]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+    # add NNGA*TC and NNGA*T
+    for twomer in twomers:
+        labeled_kmer = (twomer + methyl_core)[:kmerlength]
+        normal_kmer = (twomer + normal_core)[:kmerlength]
+        if normal_kmer in sequence_kmers:
+            labeled_kmers.append(labeled_kmer)
+        # A*TCNN
+        if kmerlength == 5:
+            labeled_kmer = (methyl_core + twomer)[1:]
+            normal_kmer = (normal_core + twomer)[1:]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+        # NGA*TCN
+        if kmerlength == 6:
+            labeled_kmer = (twomer[0] + methyl_core + twomer[1])
+            normal_kmer = (twomer[0] + normal_core + twomer[1])
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+    if kmerlength == 5:
+        for onemer in "ACTG":
+            labeled_kmer = onemer + methyl_core
+            normal_kmer = onemer + normal_core
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+            labeled_kmer = methyl_core + onemer
+            normal_kmer = normal_core + onemer
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+    return set(labeled_kmers)
+
+
+def ctag_kmers(sequence_kmers, kmerlength):
+    assert kmerlength == 5 or kmerlength == 6, "only works with kmer lengths 5 and 6"
+    # NNNCTAGNNNN
+    methyl_core = "CTIG"
+    normal_core = "CTAG"
+    nucleotides = "ACGT"
+
+    fourmers = [''.join(x) for x in product(nucleotides, repeat=4)]
+    threemers = [''.join(x) for x in product(nucleotides, repeat=3)]
+    twomers = [''.join(x) for x in product(nucleotides, repeat=2)]
+
+    labeled_kmers = []
+
+    # add A*GNNNN
+    if kmerlength == 6:
+        for fourmer in fourmers:
+            labeled_kmer = (methyl_core + fourmer)[2:]
+            normal_kmer = (normal_core + fourmer)[2:]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+    # add NNNCTA*
+    for threemer in threemers:
+        if kmerlength == 6:
+            labeled_kmer = (threemer + methyl_core)[:kmerlength]
+            normal_kmer = (threemer + normal_core)[:kmerlength]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+            labeled_kmer = (methyl_core + threemer)[1:]
+            normal_kmer = (normal_core + threemer)[1:]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+        # A*GNNN
+        if kmerlength == 5:
+            labeled_kmer = (methyl_core + threemer)[2:]
+            normal_kmer = (normal_core + threemer)[2:]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+
+    # add NNCTA*G and NNCTA*
+    for twomer in twomers:
+        labeled_kmer = (twomer + methyl_core)[:kmerlength]
+        normal_kmer = (twomer + normal_core)[:kmerlength]
+        if normal_kmer in sequence_kmers:
+            labeled_kmers.append(labeled_kmer)
+        # CTA*GNN
+        if kmerlength == 6:
+            labeled_kmer = (methyl_core + twomer)[:kmerlength]
+            normal_kmer = (normal_core + twomer)[:kmerlength]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+        # TA*GNN
+        if kmerlength == 5:
+            labeled_kmer = (methyl_core + twomer)[1:]
+            normal_kmer = (normal_core + twomer)[1:]
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+
+    if kmerlength == 5:
+        for onemer in "ACTG":
+            labeled_kmer = onemer + methyl_core
+            normal_kmer = onemer + normal_core
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+            labeled_kmer = methyl_core + onemer
+            normal_kmer = normal_core + onemer
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
+    return set(labeled_kmers)
 
 
 def motif_kmers(core, kmer_length=5, multiplier=5):
@@ -241,10 +357,13 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
     seq = get_first_seq(ref_fasta)
     sequence_kmers = get_all_sequence_kmers(seq, kmer_length).keys()
     if degenerate == "adenosine":
-        methyl_kmers = gatc_kmers(kmerlength=kmer_length, multiplier=1)
+        methyl_kmers = list(gatc_kmers(sequence_kmers=sequence_kmers, kmerlength=kmer_length))
+        methyl_kmers += list(ctag_kmers(sequence_kmers=sequence_kmers, kmerlength=kmer_length))
     else:
-        methyl_kmers = motif_kmers(core="CEAGG", kmer_length=kmer_length, multiplier=1)
-        methyl_kmers += motif_kmers(core="CETGG", kmer_length=kmer_length, multiplier=1)
+        print("C-methylation not fixed yet", file=sys.stderr)
+        sys.exit(1)
+        #methyl_kmers = motif_kmers(core="CEAGG", kmer_length=kmer_length, multiplier=1)
+        #methyl_kmers += motif_kmers(core="CETGG", kmer_length=kmer_length, multiplier=1)
     fH = open(outfile, "w")
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
     write_kmers(n_canonical_assignments, sequence_kmers)
