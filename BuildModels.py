@@ -494,8 +494,6 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
         methyl_kmers = list(gatc_kmers(sequence_kmers=sequence_kmers, kmerlength=kmer_length))
         methyl_kmers += list(ctag_kmers(sequence_kmers=sequence_kmers, kmerlength=kmer_length))
     else:
-        #print("C-methylation not fixed yet", file=sys.stderr)
-        #sys.exit(1)
         methyl_kmers = list(ccwgg_kmers(sequence_kmers=sequence_kmers, kmer_length=kmer_length))
         methyl_kmers += list(ggwcc_kmers(sequence_kmers=sequence_kmers, kmer_length=kmer_length))
     fH = open(outfile, "w")
@@ -536,6 +534,8 @@ def main(args):
         parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm', required=True, type=str)
         parser.add_argument("-o", action="store", dest="outpath", required=True)
         parser.add_argument("-x", action="store", dest="degenerate", required=True)
+        parser.add_argument('--positions', action='store', dest='positions_file', required=False, default=None)
+        parser.add_argument('--motif', action='store', dest='motif_file', required=False, default=None)
         parser.add_argument("-j", action="store", dest="jobs", required=False, default=4, type=int)
         parser.add_argument("-i", action="store", dest="iterations", required=False, type=int, default=20)
         parser.add_argument("-a", action="store", dest="batch", required=False, type=int, default=15000)
@@ -555,14 +555,20 @@ def main(args):
 
     # make the positions and motif file
     working_path = os.path.abspath(args.outpath)
-    positions_file = make_positions_file(fasta=args.reference,
-                                         degenerate=args.degenerate,
-                                         outfile=working_path + "/{}_positions.positions".format(args.degenerate))
+    if args.positions_file is not None and args.motif_file is not None:
+        assert os.path.exists(args.positions_file), "Didn't find positions file, looked {}".format(args.positions_file)
+        assert os.path.exists(args.motif_file), "Didn't find motif file, looked {}".format(args.motif_file)
+        positions_file = args.positions_file
+        motif_file = args.motif_file
+    else:
+        positions_file = make_positions_file(fasta=args.reference,
+                                             degenerate=args.degenerate,
+                                             outfile=working_path + "/{}_positions.positions".format(args.degenerate))
 
-    # make the motif file
-    motif_file = make_gatc_or_ccwgg_motif_file(fasta=args.reference,
-                                               degenerate=args.degenerate,
-                                               outfile=working_path + "/{}_target.target".format(args.degenerate))
+        # make the motif file
+        motif_file = make_gatc_or_ccwgg_motif_file(fasta=args.reference,
+                                                   degenerate=args.degenerate,
+                                                   outfile=working_path + "/{}_target.target".format(args.degenerate))
 
     # train the transitions
     models = train_model_transitions(fasta=os.path.abspath(args.reference),
