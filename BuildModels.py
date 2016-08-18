@@ -5,6 +5,7 @@ import sys
 import glob
 import pandas as pd
 import numpy as np
+import string
 from argparse import ArgumentParser
 from subprocess import Popen
 from itertools import product
@@ -152,7 +153,7 @@ def ctag_kmers(sequence_kmers, kmerlength):
                 labeled_kmers.append(labeled_kmer)
 
     if kmerlength == 5:
-        for onemer in "ACTG":
+        for onemer in nucleotides:
             labeled_kmer = onemer + methyl_core
             normal_kmer = onemer + normal_core
             if normal_kmer in sequence_kmers:
@@ -161,6 +162,139 @@ def ctag_kmers(sequence_kmers, kmerlength):
             normal_kmer = normal_core + onemer
             if normal_kmer in sequence_kmers:
                 labeled_kmers.append(labeled_kmer)
+    return set(labeled_kmers)
+
+
+def ccwgg_kmers(sequence_kmers, kmer_length):
+    def check_and_add(methyl_kmer):
+        normal_kmer = string.translate(methyl_kmer, demethylate)
+        if normal_kmer in sequence_kmers:
+            labeled_kmers.append(methyl_kmer)
+
+    labeled_kmers = []
+
+    methyl_core1 = "CEAGG"
+    methyl_core2 = "CETGG"
+    demethylate = string.maketrans("E", "C")
+
+    nucleotides = "ACGT"
+    fourmers = [''.join(x) for x in product(nucleotides, repeat=4)]
+    threemers = [''.join(x) for x in product(nucleotides, repeat=3)]
+    twomers = [''.join(x) for x in product(nucleotides, repeat=2)]
+    # NNNNCC*WGGNN
+
+    # NNNNCC*
+    if kmer_length == 6:
+        for fourmer in fourmers:
+            labeled_kmer1 = (fourmer + methyl_core1)[:kmer_length]
+            labeled_kmer2 = (fourmer + methyl_core2)[:kmer_length]
+            check_and_add(labeled_kmer1)
+            check_and_add(labeled_kmer2)
+
+    # NNNCC*W and NNNCC*
+    for threemer in threemers:
+        labeled_kmer1 = (threemer + methyl_core1)[:kmer_length]
+        labeled_kmer2 = (threemer + methyl_core2)[:kmer_length]
+        check_and_add(labeled_kmer1)
+        check_and_add(labeled_kmer2)
+
+    # NNCC*WG and NNCC*W
+    for twomer in twomers:
+        labeled_kmer1 = (twomer + methyl_core1)[:kmer_length]
+        labeled_kmer2 = (twomer + methyl_core2)[:kmer_length]
+        check_and_add(labeled_kmer1)
+        check_and_add(labeled_kmer2)
+        # C*WGGNN
+        if kmer_length == 6:
+            labeled_kmer1 = (methyl_core1 + twomer)[1:]
+            labeled_kmer2 = (methyl_core2 + twomer)[1:]
+            check_and_add(labeled_kmer1)
+            check_and_add(labeled_kmer2)
+
+    for onemer in nucleotides:
+        # CC*WGGN and C*WGGN
+        labeled_kmer1 = methyl_core1 + onemer
+        labeled_kmer2 = methyl_core2 + onemer
+        if kmer_length == 6:
+            check_and_add(labeled_kmer1)
+            check_and_add(labeled_kmer2)
+        if kmer_length == 5:
+            check_and_add(labeled_kmer1[1:])
+            check_and_add(labeled_kmer2[1:])
+        labeled_kmer1 = (onemer + methyl_core1)[:kmer_length]
+        labeled_kmer2 = (onemer + methyl_core2)[:kmer_length]
+        check_and_add(labeled_kmer1)
+        check_and_add(labeled_kmer2)
+
+    if kmer_length == 5:
+        check_and_add(methyl_core1)
+        check_and_add(methyl_core2)
+
+    return set(labeled_kmers)
+
+
+def ggwcc_kmers(sequence_kmers, kmer_length):
+    def check_and_add(methyl_kmer):
+        normal_kmer = string.translate(methyl_kmer, demethylate)
+        if normal_kmer in sequence_kmers:
+            labeled_kmers.append(methyl_kmer)
+
+    labeled_kmers = []
+
+    methyl_core1 = "GGAEC"
+    methyl_core2 = "GGTEC"
+    demethylate = string.maketrans("E", "C")
+
+    nucleotides = "ACGT"
+    fourmers = [''.join(x) for x in product(nucleotides, repeat=4)]
+    threemers = [''.join(x) for x in product(nucleotides, repeat=3)]
+    twomers = [''.join(x) for x in product(nucleotides, repeat=2)]
+
+    # NNGGWC*CNNN
+
+    # C*CNNNN
+    for fourmer in fourmers:
+        labeled_kmer1 = (methyl_core1 + fourmer)[3:]
+        labeled_kmer2 = (methyl_core2 + fourmer)[3:]
+        check_and_add(labeled_kmer1)
+        check_and_add(labeled_kmer2)
+
+    # WC*CNNN and C*CNNN
+    for threemer in threemers:
+        labeled_kmer1 = (methyl_core1 + threemer)[2:] if kmer_length == 6 else (methyl_core1 + threemer)[3:]
+        labeled_kmer2 = (methyl_core2 + threemer)[2:] if kmer_length == 6 else (methyl_core2 + threemer)[3:]
+        check_and_add(labeled_kmer1)
+        check_and_add(labeled_kmer2)
+
+    # GWC*CNN and WC*CNN
+    for twomer in twomers:
+        labeled_kmer1 = (methyl_core1 + twomer)[1:] if kmer_length == 6 else (methyl_core1 + twomer)[2:]
+        labeled_kmer2 = (methyl_core2 + twomer)[1:] if kmer_length == 6 else (methyl_core2 + twomer)[2:]
+        check_and_add(labeled_kmer1)
+        check_and_add(labeled_kmer2)
+        # NNGGWC*
+        if kmer_length == 6:
+            labeled_kmer1 = (twomer + methyl_core1)[:kmer_length]
+            labeled_kmer2 = (twomer + methyl_core2)[:kmer_length]
+            check_and_add(labeled_kmer1)
+            check_and_add(labeled_kmer2)
+
+    for onemer in nucleotides:
+        # NGGWC* and NGGWC*C
+        labeled_kmer1 = (onemer + methyl_core1)[:kmer_length]
+        labeled_kmer2 = (onemer + methyl_core2)[:kmer_length]
+        check_and_add(labeled_kmer1)
+        check_and_add(labeled_kmer2)
+        # GGWC*CN GWC*CN
+        labeled_kmer1 = methyl_core1 + onemer if kmer_length == 6 else (methyl_core1 + onemer)[1:]
+        labeled_kmer2 = methyl_core2 + onemer if kmer_length == 6 else (methyl_core2 + onemer)[1:]
+        check_and_add(labeled_kmer1)
+        check_and_add(labeled_kmer2)
+
+    if kmer_length == 5:
+        check_and_add(methyl_core1)
+        check_and_add(methyl_core2)
+
     return set(labeled_kmers)
 
 
@@ -360,10 +494,10 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
         methyl_kmers = list(gatc_kmers(sequence_kmers=sequence_kmers, kmerlength=kmer_length))
         methyl_kmers += list(ctag_kmers(sequence_kmers=sequence_kmers, kmerlength=kmer_length))
     else:
-        print("C-methylation not fixed yet", file=sys.stderr)
-        sys.exit(1)
-        #methyl_kmers = motif_kmers(core="CEAGG", kmer_length=kmer_length, multiplier=1)
-        #methyl_kmers += motif_kmers(core="CETGG", kmer_length=kmer_length, multiplier=1)
+        #print("C-methylation not fixed yet", file=sys.stderr)
+        #sys.exit(1)
+        methyl_kmers = list(ccwgg_kmers(sequence_kmers=sequence_kmers, kmer_length=kmer_length))
+        methyl_kmers += list(ggwcc_kmers(sequence_kmers=sequence_kmers, kmer_length=kmer_length))
     fH = open(outfile, "w")
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
     write_kmers(n_canonical_assignments, sequence_kmers)
