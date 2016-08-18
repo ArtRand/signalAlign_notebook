@@ -509,13 +509,13 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
     return outfile
 
 
-def build_hdp(build_alignment_path, template_model, complement_model, outpath, samples=15000):
+def build_hdp(build_alignment_path, template_model, complement_model, outpath, samples=15000, em_iteration=""):
     working_path = os.path.abspath(outpath) + "/"
     build_alignment = os.path.abspath(build_alignment_path)
     t_model = os.path.abspath(template_model)
     c_model = os.path.abspath(complement_model)
     outpath = os.path.abspath(outpath) + "/"
-    hdp_pipeline_dir = outpath + "hdpPipeline/"
+    hdp_pipeline_dir = outpath + "hdpPipeline{}/".format(em_iteration)
     os.makedirs(hdp_pipeline_dir)
     os.chdir(PATH_TO_BINS)
     c = "hdp_pipeline --build_alignment={build} -tM={tModel} -cM={cModel} -Ba=1 -Bb=1 -Ma=1 -Mb=1 -La=1 -Lb=1 " \
@@ -588,7 +588,8 @@ def HDP_EM(ref_fasta, pcr_reads, gen_reads, degenerate, jobs, positions_file, mo
                              template_model=hdp_models[0],
                              complement_model=hdp_models[1],
                              outpath=working_path,
-                             samples=gibbs_samples)
+                             samples=gibbs_samples,
+                             em_iteration="_{}".format(i))
         template_hdp, template_hmm = new_hdps[0], hdp_models[0]
         complement_hdp, complement_hmm = new_hdps[1], hdp_models[1]
 
