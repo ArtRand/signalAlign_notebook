@@ -352,7 +352,7 @@ def make_gatc_or_ccwgg_motif_file(fasta, degenerate, outfile):
 
 
 def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, motif_file, t_model, c_model,
-                        outpath, n, degenerate):
+                        outpath, n, degenerate, em_iteration="", t_hdp=None, c_hdp=None):
     def get_labels():
         if degenerate == "adenosine":
             return ["A", "I"]
@@ -362,11 +362,15 @@ def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, m
     working_path = os.path.abspath(outpath)
     commands = []
     c = PATH_TO_BINS + "runSignalAlign -d={reads} -r={fasta} -T={tModel} -C={cModel} -f=assignments " \
-                       "-o={outpath} -p={positions} -q={targetFile} -X={sub} -n={n} -j={jobs}"
+                       "-o={outpath} -p={positions} -q={targetFile} -X={sub} -n={n} -j={jobs} "
+
+    if t_hdp is not None and c_hdp is not None:
+        c += "-tH={tHdp} -cH={cHdp} ".format(tHdp=os.path.abspath(t_hdp), cHdp=os.path.abspath(c_hdp))
 
     read_sets = [pcr_reads, genomic_reads]
     labels = get_labels()
-    working_directories = [working_path + "/pcr_", working_path + "/genomic_"]
+    working_directories = [working_path + "/pcr_{}".format(em_iteration),
+                           working_path + "/genomic_{}".format(em_iteration)]
 
     assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
     assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
@@ -437,9 +441,10 @@ def make_master_assignment_table(assignment_directories):
 
 
 def train_model_transitions(fasta, pcr_reads, genomic_reads, degenerate, jobs, positions_file, iterations, batch_size,
-                            outpath, t_model, c_model, stateMachine="threeState", t_hdp=None, c_hdp=None):
+                            outpath, t_model, c_model, stateMachine="threeState", t_hdp=None, c_hdp=None,
+                            em_iteration=""):
     working_path = os.path.abspath(outpath) + "/"
-    model_directory = working_path + "{}_".format(stateMachine)
+    model_directory = working_path + "{sm}_{it}".format(sm=stateMachine, it=em_iteration)
     assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
     assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
 
@@ -524,6 +529,72 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
             hdp_pipeline_dir + "complement.singleLevelPriorEcoli.nhdp"]
 
 
+def HDP_EM(ref_fasta, pcr_reads, gen_reads, degenerate, jobs, positions_file, motif_file, n_assignment_alns,
+           n_canonical_assns, n_methyl_assns, iterations, batch_size, working_path, start_hdps, threshold,
+           start_temp_hmm, start_comp_hmm, n_iterations, gibbs_samples):
+    template_hdp = start_hdps[0]
+    complement_hdp = start_hdps[1]
+    template_hmm = start_temp_hmm
+    complement_hmm = start_comp_hmm
+    for i in xrange(n_iterations):
+        # first train the model transitions
+        hdp_models = train_model_transitions(fasta=ref_fasta,
+                                             pcr_reads=pcr_reads,
+                                             genomic_reads=gen_reads,
+                                             degenerate=degenerate,
+                                             jobs=jobs,
+                                             positions_file=positions_file,
+                                             iterations=iterations,
+                                             batch_size=batch_size,
+                                             outpath=working_path,
+                                             em_iteration="{}_".format(i),
+                                             stateMachine="threeStateHdp",
+                                             t_hdp=template_hdp,
+                                             c_hdp=complement_hdp,
+                                             t_model=template_hmm,
+                                             c_model=complement_hmm)
+        # next get assignments
+        assignment_dirs = run_guide_alignment(fasta=ref_fasta,
+                                              pcr_reads=pcr_reads,
+                                              genomic_reads=gen_reads,
+                                              jobs=jobs,
+                                              positions_file=positions_file,
+                                              motif_file=motif_file,
+                                              n=n_assignment_alns,
+                                              em_iteration="{}_".format(i),
+                                              degenerate=degenerate,
+                                              t_model=hdp_models[0],
+                                              c_model=hdp_models[1],
+                                              t_hdp=hdp_models[2],
+                                              c_hdp=hdp_models[3],
+                                              outpath=working_path)
+
+        assert kmer_length_from_model(hdp_models[0]) == kmer_length_from_model(
+            hdp_models[1]), "Models had different kmer lengths"
+
+        # assemble them into a big table
+        master = make_master_assignment_table(assignment_directories=assignment_dirs)
+        # make the build alignment of assignments
+        build_alignment = make_build_alignment(assignments=master,
+                                               degenerate=degenerate,
+                                               kmer_length=kmer_length_from_model(hdp_models[0]),
+                                               ref_fasta=ref_fasta,
+                                               n_canonical_assignments=n_canonical_assns,
+                                               n_methyl_assignments=n_methyl_assns,
+                                               outfile=working_path + "/buildAlignment_{}.tsv".format(i),
+                                               threshold=threshold)
+        # make new hdps
+        new_hdps = build_hdp(build_alignment_path=build_alignment,
+                             template_model=hdp_models[0],
+                             complement_model=hdp_models[1],
+                             outpath=working_path,
+                             samples=gibbs_samples)
+        template_hdp, template_hmm = new_hdps[0], hdp_models[0]
+        complement_hdp, complement_hmm = new_hdps[1], hdp_models[1]
+
+    return template_hmm, complement_hmm, template_hdp, complement_hdp
+
+
 def main(args):
     def parse_args():
         parser = ArgumentParser(description=__doc__)
@@ -545,6 +616,7 @@ def main(args):
         parser.add_argument("-e", action="store", dest="n_test_alns", required=False, type=int, default=1000)
         parser.add_argument("-t", action="store", dest="assignment_threshold", required=False, type=float, default=0.8)
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
+        parser.add_argument("-hdp_em", action="store", dest="HDP_EM", required=False, type=int, default=None)
         args = parser.parse_args()
         return args
 
@@ -611,21 +683,43 @@ def main(args):
                      complement_model=models[1],
                      outpath=working_path,
                      samples=args.samples)
-    # train HMM/HDP
-    hdp_models = train_model_transitions(fasta=os.path.abspath(args.reference),
-                                         pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                                         genomic_reads=os.path.abspath(args.genomic_reads) + "/",
-                                         degenerate=args.degenerate,
-                                         jobs=args.jobs,
-                                         positions_file=positions_file,
-                                         iterations=args.iterations,
-                                         batch_size=args.batch,
-                                         outpath=working_path,
-                                         stateMachine="threeStateHdp",
-                                         t_hdp=hdps[0],
-                                         c_hdp=hdps[1],
-                                         t_model=os.path.abspath(args.in_T_Hmm),
-                                         c_model=os.path.abspath(args.in_C_Hmm))
+
+    if args.HDP_EM is not None:
+        hdp_models = HDP_EM(ref_fasta=os.path.abspath(args.reference),
+                            pcr_reads=os.path.abspath(args.pcr_reads) + "/",
+                            gen_reads=os.path.abspath(args.genomic_reads) + "/",
+                            degenerate=args.degenerate,
+                            jobs=args.jobs,
+                            positions_file=positions_file,
+                            motif_file=motif_file,
+                            n_assignment_alns=args.n_aligns,
+                            n_canonical_assns=args.assignments,
+                            n_methyl_assns=args.methyl_assignments,
+                            iterations=args.iterations,
+                            batch_size=args.batch,
+                            working_path=working_path,
+                            start_hdps=hdps,
+                            threshold=args.assignment_threshold,
+                            start_temp_hmm=models[0],
+                            start_comp_hmm=models[1],
+                            n_iterations=args.HDP_EM,
+                            gibbs_samples=args.samples)
+    else:
+        # train HMM/HDP
+        hdp_models = train_model_transitions(fasta=os.path.abspath(args.reference),
+                                             pcr_reads=os.path.abspath(args.pcr_reads) + "/",
+                                             genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                             degenerate=args.degenerate,
+                                             jobs=args.jobs,
+                                             positions_file=positions_file,
+                                             iterations=args.iterations,
+                                             batch_size=args.batch,
+                                             outpath=working_path,
+                                             stateMachine="threeStateHdp",
+                                             t_hdp=hdps[0],
+                                             c_hdp=hdps[1],
+                                             t_model=os.path.abspath(args.in_T_Hmm),
+                                             c_model=os.path.abspath(args.in_C_Hmm))
     # run methylation variant calling experiment
     run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
                                    pcr_reads=os.path.abspath(args.pcr_reads) + "/",
