@@ -82,6 +82,11 @@ def gatc_kmers(sequence_kmers, kmerlength):
             normal_kmer = (twomer[0] + normal_core + twomer[1])
             if normal_kmer in sequence_kmers:
                 labeled_kmers.append(labeled_kmer)
+            # TODO forgot GA*TCNN for 6mers!
+            labeled_kmer = (methyl_core + twomer)
+            normal_kmer = (normal_core + twomer)
+            if normal_kmer in sequence_kmers:
+                labeled_kmers.append(labeled_kmer)
     if kmerlength == 5:
         for onemer in "ACTG":
             labeled_kmer = onemer + methyl_core
