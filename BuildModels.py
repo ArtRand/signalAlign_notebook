@@ -24,6 +24,11 @@ def kmer_length_from_model(model_file):
     assert kmer_length == 5 or kmer_length == 6
     return kmer_length
 
+def get_methyl_char(degenerate):
+    if degenerate == "adenosine":
+        return "I"
+    else:
+        return "E"
 
 def make_positions_file(fasta, degenerate, outfile):
     if degenerate == "adenosine":
@@ -453,10 +458,7 @@ def train_model_transitions(fasta, pcr_reads, genomic_reads, degenerate, jobs, p
     assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
     assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
 
-    if degenerate == "adenosine":
-        methyl_char = "I"
-    else:
-        methyl_char = "E"
+    methyl_char = get_methyl_char(degenerate)
 
     os.chdir(PATH_TO_BINS)
     c = "trainModels -d={pcr} -d={genomic} -X=C -X={methylChar} -r={fasta} -i={iter} -a={batch} --transitions " \
@@ -481,9 +483,9 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
                          n_methyl_assignments, outfile, threshold):
     def write_kmers(max_assignments, kmer_list):
         for strand in ["t", "c"]:
-            by_stand = assignments.ix[(assignments['strand'] == strand) & (assignments['prob'] >= threshold)]
+            by_strand = assignments.ix[(assignments['strand'] == strand) & (assignments['prob'] >= threshold)]
             for k in kmer_list:
-                kmer_assignments = by_stand.ix[by_stand['kmer'] == k]
+                kmer_assignments = by_strand.ix[by_strand['kmer'] == k]
                 if kmer_assignments.empty:
                     print("missing kmer {}, continuing".format(k))
                     continue
@@ -510,6 +512,33 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
     write_kmers(n_canonical_assignments, sequence_kmers)
     write_kmers(n_methyl_assignments, methyl_kmers)
+    fH.close()
+    return outfile
+
+
+def make_bulk_build_alignment(assignments, degenerate, n_canonical_assignments, n_methyl_assignments, threshold,
+                              outfile):
+    def write_bulk_assignments(assignment_df, max_assignments):
+        for strand in ["t", "c"]:
+            by_strand = assignment_df.ix[(assignment_df['strand'] == strand) & (assignment_df['prob'] >= threshold)]
+            n = 0
+            for i, r in by_strand.iterrows():
+                fH.write(
+                    entry_line.format(strand=r['strand'], kmer=r['kmer'], event=r['level_mean'], prob=r['prob']))
+                n += 1
+                if n >= max_assignments:
+                    break
+            if n < max_assignments:
+                print("WARNING: only found {found} assignments when {requested} were requested"
+                      "".format(found=n, requested=max_assignments))
+
+    fH = open(outfile, "w")
+    methyl_char = get_methyl_char(degenerate)
+    entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
+    labeled = assignments.loc[assignments["kmer"].str.contains(methyl_char)]
+    canonical = assignments.loc[~(assignments["kmer"].str.contains(methyl_char))]
+    write_bulk_assignments(labeled, n_methyl_assignments)
+    write_bulk_assignments(canonical, n_canonical_assignments)
     fH.close()
     return outfile
 
@@ -675,14 +704,22 @@ def main(args):
     assert kmer_length_from_model(models[0]) == kmer_length_from_model(models[1]), "Models had different kmer lengths"
     # concatenate the assignments into table
     master = make_master_assignment_table(assignment_dirs)
-    build_alignment = make_build_alignment(assignments=master,
-                                           degenerate=args.degenerate,
-                                           kmer_length=kmer_length_from_model(models[0]),
-                                           ref_fasta=os.path.abspath(args.reference),
-                                           n_canonical_assignments=args.assignments,
-                                           n_methyl_assignments=args.methyl_assignments,
-                                           outfile=working_path + "/buildAlignment.tsv",
-                                           threshold=args.assignment_threshold)
+    if args.bulk is True:
+        build_alignment = make_bulk_build_alignment(assignments=master,
+                                                    degenerate=args.degenerate,
+                                                    n_canonical_assignments=args.assignments,
+                                                    n_methyl_assignments=args.methyl_assignments,
+                                                    threshold=args.assignment_threshold,
+                                                    outfile=working_path + "/buildAlignment.tsv")
+    else:
+        build_alignment = make_build_alignment(assignments=master,
+                                               degenerate=args.degenerate,
+                                               kmer_length=kmer_length_from_model(models[0]),
+                                               ref_fasta=os.path.abspath(args.reference),
+                                               n_canonical_assignments=args.assignments,
+                                               n_methyl_assignments=args.methyl_assignments,
+                                               outfile=working_path + "/buildAlignment.tsv",
+                                               threshold=args.assignment_threshold)
     # build hdp
     hdps = build_hdp(build_alignment_path=build_alignment,
                      template_model=models[0],
