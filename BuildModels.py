@@ -642,6 +642,7 @@ def main(args):
         parser.add_argument("-x", action="store", dest="degenerate", required=True)
         parser.add_argument('--positions', action='store', dest='positions_file', required=False, default=None)
         parser.add_argument('--motif', action='store', dest='motif_file', required=False, default=None)
+        parser.add_argument('--bulk', action='store_true', dest='bulk', required=False, default=False)
         parser.add_argument("-j", action="store", dest="jobs", required=False, default=4, type=int)
         parser.add_argument("-i", action="store", dest="iterations", required=False, type=int, default=20)
         parser.add_argument("-a", action="store", dest="batch", required=False, type=int, default=15000)
