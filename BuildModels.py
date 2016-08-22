@@ -24,11 +24,13 @@ def kmer_length_from_model(model_file):
     assert kmer_length == 5 or kmer_length == 6
     return kmer_length
 
+
 def get_methyl_char(degenerate):
     if degenerate == "adenosine":
         return "I"
     else:
         return "E"
+
 
 def make_positions_file(fasta, degenerate, outfile):
     if degenerate == "adenosine":
@@ -565,7 +567,7 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
 
 def HDP_EM(ref_fasta, pcr_reads, gen_reads, degenerate, jobs, positions_file, motif_file, n_assignment_alns,
            n_canonical_assns, n_methyl_assns, iterations, batch_size, working_path, start_hdps, threshold,
-           start_temp_hmm, start_comp_hmm, n_iterations, gibbs_samples):
+           start_temp_hmm, start_comp_hmm, n_iterations, gibbs_samples, bulk=False):
     template_hdp = start_hdps[0]
     complement_hdp = start_hdps[1]
     template_hmm = start_temp_hmm
@@ -609,14 +611,22 @@ def HDP_EM(ref_fasta, pcr_reads, gen_reads, degenerate, jobs, positions_file, mo
         # assemble them into a big table
         master = make_master_assignment_table(assignment_directories=assignment_dirs)
         # make the build alignment of assignments
-        build_alignment = make_build_alignment(assignments=master,
-                                               degenerate=degenerate,
-                                               kmer_length=kmer_length_from_model(hdp_models[0]),
-                                               ref_fasta=ref_fasta,
-                                               n_canonical_assignments=n_canonical_assns,
-                                               n_methyl_assignments=n_methyl_assns,
-                                               outfile=working_path + "/buildAlignment_{}.tsv".format(i),
-                                               threshold=threshold)
+        if bulk is True:
+            build_alignment = make_bulk_build_alignment(assignments=master,
+                                                        degenerate=degenerate,
+                                                        n_canonical_assignments=n_canonical_assns,
+                                                        n_methyl_assignments=n_methyl_assns,
+                                                        threshold=threshold,
+                                                        outfile=working_path + "/buildAlignment_{}.tsv".format(i))
+        else:
+            build_alignment = make_build_alignment(assignments=master,
+                                                   degenerate=degenerate,
+                                                   kmer_length=kmer_length_from_model(hdp_models[0]),
+                                                   ref_fasta=ref_fasta,
+                                                   n_canonical_assignments=n_canonical_assns,
+                                                   n_methyl_assignments=n_methyl_assns,
+                                                   outfile=working_path + "/buildAlignment_{}.tsv".format(i),
+                                                   threshold=threshold)
         # make new hdps
         new_hdps = build_hdp(build_alignment_path=build_alignment,
                              template_model=hdp_models[0],
