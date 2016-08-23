@@ -567,7 +567,7 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
 
 def HDP_EM(ref_fasta, pcr_reads, gen_reads, degenerate, jobs, positions_file, motif_file, n_assignment_alns,
            n_canonical_assns, n_methyl_assns, iterations, batch_size, working_path, start_hdps, threshold,
-           start_temp_hmm, start_comp_hmm, n_iterations, gibbs_samples, bulk=False):
+           start_temp_hmm, start_comp_hmm, n_iterations, gibbs_samples, bulk):
     template_hdp = start_hdps[0]
     complement_hdp = start_hdps[1]
     template_hmm = start_temp_hmm
@@ -757,7 +757,8 @@ def main(args):
                             start_temp_hmm=models[0],
                             start_comp_hmm=models[1],
                             n_iterations=args.HDP_EM,
-                            gibbs_samples=args.samples)
+                            gibbs_samples=args.samples,
+                            bulk=args.bulk)
     else:
         # train HMM/HDP
         hdp_models = train_model_transitions(fasta=os.path.abspath(args.reference),
