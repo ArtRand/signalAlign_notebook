@@ -492,7 +492,7 @@ def train_model_transitions(fasta, pcr_fofn, genomic_fofn, degenerate, jobs, pos
 
     os.chdir(PATH_TO_BINS)
     c = "trainModels -fofn={pcr} -fofn={genomic} -X=C -X={methylChar} -r={fasta} -i={iter} -a={batch} --transitions " \
-        "-smt={smt} -T={tModel} -C={cModel} -j={jobs} -x=adenosine -p={positions} -o={out} " \
+        "-smt={smt} -T={tModel} -C={cModel} -j={jobs} -p={positions} -o={out} " \
         "".format(pcr=pcr_fofn, genomic=genomic_fofn, fasta=fasta, iter=iterations, batch=batch_size,
                   smt=stateMachine, tModel=t_model, cModel=c_model, jobs=jobs, methylChar=methyl_char,
                   positions=positions_file, out=model_directory)
