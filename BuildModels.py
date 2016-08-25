@@ -35,11 +35,11 @@ def train_test_split_fofn(pcr_reads_dir, genomic_reads_dir, working_directory, s
     train_pcr_files, test_pcr_files = split_files(pcr_read_files)
     train_gen_files, test_gen_files = split_files(genomic_read_files)
 
-    pcr_train_fofn = write_fofn(working_directory + "pcr_train.fofn", train_pcr_files)
-    pcr_test_fofn = write_fofn(working_directory + "pcr_test.fofn", test_pcr_files)
+    pcr_train_fofn = write_fofn(working_directory + "/pcr_train.fofn", train_pcr_files)
+    pcr_test_fofn = write_fofn(working_directory + "/pcr_test.fofn", test_pcr_files)
 
-    gen_train_fofn = write_fofn(working_directory + "gen_train.fofn", train_gen_files)
-    gen_test_fofn = write_fofn(working_directory + "gen_test.fofn", test_gen_files)
+    gen_train_fofn = write_fofn(working_directory + "/gen_train.fofn", train_gen_files)
+    gen_test_fofn = write_fofn(working_directory + "/gen_test.fofn", test_gen_files)
 
     return (pcr_train_fofn, pcr_test_fofn), (gen_train_fofn, gen_test_fofn)
 
