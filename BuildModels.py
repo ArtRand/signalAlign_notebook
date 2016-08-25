@@ -9,11 +9,39 @@ import string
 from argparse import ArgumentParser
 from subprocess import Popen
 from itertools import product
+from random import shuffle
 from commonFunctions import get_first_seq, make_motif_file, get_all_sequence_kmers, make_CCWGG_positions_file, \
     find_ccwgg_motifs
 
 PATH_TO_SIGNALALIGN = os.path.abspath("../signalAlign/")
 PATH_TO_BINS = PATH_TO_SIGNALALIGN + "/bin/"
+
+
+def train_test_split_fofn(pcr_reads_dir, genomic_reads_dir, working_directory, split=0.5):
+    def split_files(files):
+        shuffle(files)
+        split_point = int(split * len(files))
+        return files[:split_point], files[split_point:]
+
+    def write_fofn(outfile, files):
+        with open(outfile, "w") as fH:
+            for f in files:
+                fH.write("{filepath}\n".format(filepath=f))
+        return outfile
+
+    pcr_read_files = [pcr_reads_dir + x for x in os.listdir(pcr_reads_dir) if x.endswith(".fast5")]
+    genomic_read_files = [genomic_reads_dir + x for x in os.listdir(genomic_reads_dir) if x.endswith(".fast5")]
+    assert len(pcr_read_files) > 0 and len(genomic_read_files) > 0
+    train_pcr_files, test_pcr_files = split_files(pcr_read_files)
+    train_gen_files, test_gen_files = split_files(genomic_read_files)
+
+    pcr_train_fofn = write_fofn(working_directory + "pcr_train.fofn", train_pcr_files)
+    pcr_test_fofn = write_fofn(working_directory + "pcr_test.fofn", test_pcr_files)
+
+    gen_train_fofn = write_fofn(working_directory + "gen_train.fofn", train_gen_files)
+    gen_test_fofn = write_fofn(working_directory + "gen_test.fofn", test_gen_files)
+
+    return (pcr_train_fofn, pcr_test_fofn), (gen_train_fofn, gen_test_fofn)
 
 
 def kmer_length_from_model(model_file):
@@ -363,7 +391,7 @@ def make_gatc_or_ccwgg_motif_file(fasta, degenerate, outfile):
     return outfile
 
 
-def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, motif_file, t_model, c_model,
+def run_guide_alignment(fasta, pcr_fofn, genomic_fofn, jobs, positions_file, motif_file, t_model, c_model,
                         outpath, n, degenerate, em_iteration="", t_hdp=None, c_hdp=None):
     def get_labels():
         if degenerate == "adenosine":
@@ -373,13 +401,13 @@ def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, m
 
     working_path = os.path.abspath(outpath)
     commands = []
-    c = PATH_TO_BINS + "runSignalAlign -d={reads} -r={fasta} -T={tModel} -C={cModel} -f=assignments " \
+    c = PATH_TO_BINS + "runSignalAlign -fofn={fofn} -r={fasta} -T={tModel} -C={cModel} -f=assignments " \
                        "-o={outpath} -p={positions} -q={targetFile} -X={sub} -n={n} -j={jobs} "
 
     if t_hdp is not None and c_hdp is not None:
         c += "-tH={tHdp} -cH={cHdp} ".format(tHdp=os.path.abspath(t_hdp), cHdp=os.path.abspath(c_hdp))
 
-    read_sets = [pcr_reads, genomic_reads]
+    read_sets = [pcr_fofn, genomic_fofn]
     labels = get_labels()
     working_directories = [working_path + "/pcr_{}".format(em_iteration),
                            working_path + "/genomic_{}".format(em_iteration)]
@@ -387,9 +415,9 @@ def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, m
     assert os.path.exists(t_model), "Didn't find template model, looked {}".format(t_model)
     assert os.path.exists(c_model), "Didn't find complement model, looked {}".format(c_model)
 
-    for reads, label, working_directory in zip(read_sets, labels, working_directories):
+    for fofn, label, working_directory in zip(read_sets, labels, working_directories):
         # assemble the command
-        command = c.format(reads=reads, fasta=fasta, tModel=t_model, cModel=c_model, outpath=working_directory,
+        command = c.format(fofn=fofn, fasta=fasta, tModel=t_model, cModel=c_model, outpath=working_directory,
                            positions=positions_file, targetFile=motif_file, sub=label, n=n, jobs=int(jobs/2))
         commands.append(command)
 
@@ -403,14 +431,14 @@ def run_guide_alignment(fasta, pcr_reads, genomic_reads, jobs, positions_file, m
     return working_directories
 
 
-def run_variant_calling_experiment(fasta, pcr_reads, genomic_reads, jobs, positions_file, motif_file, t_model, c_model,
-                                  outpath, n, degenerate, t_hdp, c_hdp):
+def run_variant_calling_experiment(fasta, pcr_fofn, genomic_fofn, jobs, positions_file, motif_file, t_model, c_model,
+                                   outpath, n, degenerate, t_hdp, c_hdp):
     working_path = os.path.abspath(outpath)
     commands = []
-    c = PATH_TO_BINS + "runSignalAlign -d={reads} -r={fasta} -T={tModel} -C={cModel} -f=variantCaller " \
+    c = PATH_TO_BINS + "runSignalAlign -fofn={fofn} -r={fasta} -T={tModel} -C={cModel} -f=variantCaller " \
                        "-o={outpath} -p={positions} -q={targetFile} -n={n} -j={jobs} -x={degenerate} " \
                        "-tH={tHdp} -cH={cHdp} -smt=threeStateHdp"
-    read_sets = [pcr_reads, genomic_reads]
+    read_sets = [pcr_fofn, genomic_fofn]
     working_directories = [working_path + "/{}_pcr_".format(degenerate),
                            working_path + "/{}_genomic_".format(degenerate)]
 
@@ -419,9 +447,9 @@ def run_variant_calling_experiment(fasta, pcr_reads, genomic_reads, jobs, positi
     assert os.path.exists(t_hdp), "Didn't find template model, looked {}".format(t_hdp)
     assert os.path.exists(c_hdp), "Didn't find complement model, looked {}".format(c_hdp)
 
-    for reads, working_directory in zip(read_sets, working_directories):
+    for fofn, working_directory in zip(read_sets, working_directories):
         # assemble the command
-        command = c.format(reads=reads, fasta=fasta, tModel=t_model, cModel=c_model, outpath=working_directory,
+        command = c.format(fofn=fofn, fasta=fasta, tModel=t_model, cModel=c_model, outpath=working_directory,
                            positions=positions_file, targetFile=motif_file, n=n, jobs=int(jobs/2), tHdp=t_hdp,
                            cHdp=c_hdp, degenerate=degenerate)
         commands.append(command)
@@ -452,7 +480,7 @@ def make_master_assignment_table(assignment_directories):
     return pd.concat(assignment_dfs)
 
 
-def train_model_transitions(fasta, pcr_reads, genomic_reads, degenerate, jobs, positions_file, iterations, batch_size,
+def train_model_transitions(fasta, pcr_fofn, genomic_fofn, degenerate, jobs, positions_file, iterations, batch_size,
                             outpath, t_model, c_model, stateMachine="threeState", t_hdp=None, c_hdp=None,
                             em_iteration=""):
     working_path = os.path.abspath(outpath) + "/"
@@ -463,9 +491,9 @@ def train_model_transitions(fasta, pcr_reads, genomic_reads, degenerate, jobs, p
     methyl_char = get_methyl_char(degenerate)
 
     os.chdir(PATH_TO_BINS)
-    c = "trainModels -d={pcr} -d={genomic} -X=C -X={methylChar} -r={fasta} -i={iter} -a={batch} --transitions " \
+    c = "trainModels -fofn={pcr} -fofn={genomic} -X=C -X={methylChar} -r={fasta} -i={iter} -a={batch} --transitions " \
         "-smt={smt} -T={tModel} -C={cModel} -j={jobs} -x=adenosine -p={positions} -o={out} " \
-        "".format(pcr=pcr_reads, genomic=genomic_reads, fasta=fasta, iter=iterations, batch=batch_size,
+        "".format(pcr=pcr_fofn, genomic=genomic_fofn, fasta=fasta, iter=iterations, batch=batch_size,
                   smt=stateMachine, tModel=t_model, cModel=c_model, jobs=jobs, methylChar=methyl_char,
                   positions=positions_file, out=model_directory)
     if t_hdp is not None and c_hdp is not None:
@@ -565,7 +593,7 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
             hdp_pipeline_dir + "complement.singleLevelPriorEcoli.nhdp"]
 
 
-def HDP_EM(ref_fasta, pcr_reads, gen_reads, degenerate, jobs, positions_file, motif_file, n_assignment_alns,
+def HDP_EM(ref_fasta, pcr_fofn, gen_fofn, degenerate, jobs, positions_file, motif_file, n_assignment_alns,
            n_canonical_assns, n_methyl_assns, iterations, batch_size, working_path, start_hdps, threshold,
            start_temp_hmm, start_comp_hmm, n_iterations, gibbs_samples, bulk):
     template_hdp = start_hdps[0]
@@ -575,8 +603,8 @@ def HDP_EM(ref_fasta, pcr_reads, gen_reads, degenerate, jobs, positions_file, mo
     for i in xrange(n_iterations):
         # first train the model transitions
         hdp_models = train_model_transitions(fasta=ref_fasta,
-                                             pcr_reads=pcr_reads,
-                                             genomic_reads=gen_reads,
+                                             pcr_fofn=pcr_fofn,
+                                             genomic_fofn=gen_fofn,
                                              degenerate=degenerate,
                                              jobs=jobs,
                                              positions_file=positions_file,
@@ -591,8 +619,8 @@ def HDP_EM(ref_fasta, pcr_reads, gen_reads, degenerate, jobs, positions_file, mo
                                              c_model=complement_hmm)
         # next get assignments
         assignment_dirs = run_guide_alignment(fasta=ref_fasta,
-                                              pcr_reads=pcr_reads,
-                                              genomic_reads=gen_reads,
+                                              pcr_fofn=pcr_fofn,
+                                              genomic_fofn=gen_fofn,
                                               jobs=jobs,
                                               positions_file=positions_file,
                                               motif_file=motif_file,
@@ -679,6 +707,7 @@ def main(args):
         positions_file = args.positions_file
         motif_file = args.motif_file
     else:
+        # make the positions file
         positions_file = make_positions_file(fasta=args.reference,
                                              degenerate=args.degenerate,
                                              outfile=working_path + "/{}_positions.positions".format(args.degenerate))
@@ -688,10 +717,15 @@ def main(args):
                                                    degenerate=args.degenerate,
                                                    outfile=working_path + "/{}_target.target".format(args.degenerate))
 
+    # make the fofns for training and testing
+    pcr_fofns, gen_fofns = train_test_split_fofn(pcr_reads_dir=args.pcr_reads,
+                                                 genomic_reads_dir=args.genomic_reads,
+                                                 working_directory=working_path)
+
     # train the transitions
     models = train_model_transitions(fasta=os.path.abspath(args.reference),
-                                     pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                                     genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                     pcr_fofn=pcr_fofns[0],
+                                     genomic_fofn=gen_fofns[0],
                                      degenerate=args.degenerate,
                                      jobs=args.jobs,
                                      positions_file=positions_file,
@@ -702,8 +736,8 @@ def main(args):
                                      c_model=os.path.abspath(args.in_C_Hmm))
     # do the initial alignments
     assignment_dirs = run_guide_alignment(fasta=os.path.abspath(args.reference),
-                                          pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                                          genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                          pcr_fofn=pcr_fofns[0],
+                                          genomic_fofn=gen_fofns[0],
                                           jobs=args.jobs,
                                           positions_file=positions_file,
                                           motif_file=motif_file,
@@ -740,8 +774,8 @@ def main(args):
 
     if args.HDP_EM is not None:
         hdp_models = HDP_EM(ref_fasta=os.path.abspath(args.reference),
-                            pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                            gen_reads=os.path.abspath(args.genomic_reads) + "/",
+                            pcr_fofn=pcr_fofns[0],
+                            gen_fofn=gen_fofns[0],
                             degenerate=args.degenerate,
                             jobs=args.jobs,
                             positions_file=positions_file,
@@ -762,8 +796,8 @@ def main(args):
     else:
         # train HMM/HDP
         hdp_models = train_model_transitions(fasta=os.path.abspath(args.reference),
-                                             pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                                             genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                             pcr_fofn=pcr_fofns[0],
+                                             genomic_fofn=gen_fofns[0],
                                              degenerate=args.degenerate,
                                              jobs=args.jobs,
                                              positions_file=positions_file,
@@ -777,8 +811,8 @@ def main(args):
                                              c_model=os.path.abspath(args.in_C_Hmm))
     # run methylation variant calling experiment
     run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
-                                   pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                                   genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+                                   pcr_fofn=pcr_fofns[1],
+                                   genomic_fofn=gen_fofns[1],
                                    jobs=args.jobs,
                                    positions_file=positions_file,
                                    motif_file=motif_file,
@@ -790,19 +824,19 @@ def main(args):
                                    t_hdp=hdp_models[2],
                                    c_hdp=hdp_models[3])
     # run the control experiment
-    run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
-                                   pcr_reads=os.path.abspath(args.pcr_reads) + "/",
-                                   genomic_reads=os.path.abspath(args.genomic_reads) + "/",
-                                   jobs=args.jobs,
-                                   positions_file=positions_file,
-                                   motif_file=motif_file,
-                                   t_model=hdp_models[0],
-                                   c_model=hdp_models[1],
-                                   outpath=working_path,
-                                   n=args.n_test_alns,
-                                   degenerate="variant",
-                                   t_hdp=hdp_models[2],
-                                   c_hdp=hdp_models[3])
+    #run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
+    #                               pcr_reads=os.path.abspath(args.pcr_reads) + "/",
+    #                               genomic_reads=os.path.abspath(args.genomic_reads) + "/",
+    #                               jobs=args.jobs,
+    #                               positions_file=positions_file,
+    #                               motif_file=motif_file,
+    #                               t_model=hdp_models[0],
+    #                               c_model=hdp_models[1],
+    #                               outpath=working_path,
+    #                               n=args.n_test_alns,
+    #                               degenerate="variant",
+    #                               t_hdp=hdp_models[2],
+    #                               c_hdp=hdp_models[3])
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
