@@ -691,6 +691,7 @@ def main(args):
         parser.add_argument("-t", action="store", dest="assignment_threshold", required=False, type=float, default=0.8)
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
         parser.add_argument("-hdp_em", action="store", dest="HDP_EM", required=False, type=int, default=None)
+        parser.add_argument("--split", action="store", dest="split", required=False, type=float, default=0.5)
         args = parser.parse_args()
         return args
 
@@ -720,7 +721,8 @@ def main(args):
     # make the fofns for training and testing
     pcr_fofns, gen_fofns = train_test_split_fofn(pcr_reads_dir=args.pcr_reads,
                                                  genomic_reads_dir=args.genomic_reads,
-                                                 working_directory=working_path)
+                                                 working_directory=working_path,
+                                                 split=args.split)
 
     # train the transitions
     models = train_model_transitions(fasta=os.path.abspath(args.reference),
