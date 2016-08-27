@@ -678,8 +678,8 @@ def main(args):
         parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm', required=True, type=str)
         parser.add_argument("-o", action="store", dest="outpath", required=True)
         parser.add_argument("-x", action="store", dest="degenerate", required=True)
-        parser.add_argument('--positions', action='store', dest='positions_file', required=False, default=None)
-        parser.add_argument('--motif', action='store', dest='motif_file', required=False, default=None)
+        parser.add_argument('--positions', action='append', dest='positions_file', required=False, default=None)
+        parser.add_argument('--motif', action='append', dest='motif_file', required=False, default=None)
         parser.add_argument('--bulk', action='store_true', dest='bulk', required=False, default=False)
         parser.add_argument("-j", action="store", dest="jobs", required=False, default=4, type=int)
         parser.add_argument("-i", action="store", dest="iterations", required=False, type=int, default=20)
@@ -703,10 +703,16 @@ def main(args):
     # make the positions and motif file
     working_path = os.path.abspath(args.outpath)
     if args.positions_file is not None and args.motif_file is not None:
-        assert os.path.exists(args.positions_file), "Didn't find positions file, looked {}".format(args.positions_file)
-        assert os.path.exists(args.motif_file), "Didn't find motif file, looked {}".format(args.motif_file)
-        positions_file = args.positions_file
-        motif_file = args.motif_file
+        assert len(args.positions_file) == 2 and len(args.motif_file) == 2, "need to give training and testing " \
+                                                                            "positions/motif files"
+        for i in range(2):
+            assert os.path.exists(args.positions_file[i]), "Didn't find positions file, looked " \
+                                                           "{}".format(args.positions_file)
+            assert os.path.exists(args.motif_file[i]), "Didn't find motif file, looked {}".format(args.motif_file)
+        positions_file = args.positions_file[0]
+        motif_file = args.motif_file[0]
+        test_positions = args.positions_file[1]
+        test_motifs = args.motif_file[1]
     else:
         # make the positions file
         positions_file = make_positions_file(fasta=args.reference,
@@ -717,6 +723,8 @@ def main(args):
         motif_file = make_gatc_or_ccwgg_motif_file(fasta=args.reference,
                                                    degenerate=args.degenerate,
                                                    outfile=working_path + "/{}_target.target".format(args.degenerate))
+        test_positions = positions_file
+        test_motifs = motif_file
 
     # make the fofns for training and testing
     pcr_fofns, gen_fofns = train_test_split_fofn(pcr_reads_dir=args.pcr_reads,
@@ -816,8 +824,8 @@ def main(args):
                                    pcr_fofn=pcr_fofns[1],
                                    genomic_fofn=gen_fofns[1],
                                    jobs=args.jobs,
-                                   positions_file=positions_file,
-                                   motif_file=motif_file,
+                                   positions_file=test_positions,
+                                   motif_file=test_motifs,
                                    t_model=hdp_models[0],
                                    c_model=hdp_models[1],
                                    outpath=working_path,
