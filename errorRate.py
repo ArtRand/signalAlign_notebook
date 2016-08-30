@@ -104,6 +104,7 @@ def main(args):
         gen_batch = gen_alignments[block_start:block_end]
         pcr_probs = parse_reads_probs(pcr_batch)
         gen_probs = parse_reads_probs(gen_batch)
+
         pcr_false_positive, pcr_true_negative, pcr_coverage = variant_call_stats(probs=pcr_probs,
                                                                                  strand=args.strand,
                                                                                  threshold=args.threshold,
@@ -116,7 +117,7 @@ def main(args):
         accuracy = (gen_true_positive + pcr_true_negative) / (pcr_false_positive + pcr_true_negative +
                                                               gen_true_positive + gen_false_negative)
 
-        print(accuracy)
+        print(accuracy, (np.mean([pcr_coverage, gen_coverage])))
         i += 1
 
 
