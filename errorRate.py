@@ -27,9 +27,18 @@ def parse_reads_probs(alignment_files):
     return lines
 
 
-def variant_call_stats(probs, read_score=40):
+def variant_call_stats(probs, read_score, strand, threshold):
     assert len(probs) > 0, "Probs length 0"
-    vclr = sp.Popen(["VClr", "-tool=methyl", "-s={}".format(read_score)], stdin=sp.PIPE, stdout=sp.PIPE)
+    vclr_command = ["VClr", "-tool=methyl"]
+    if strand is not None:
+        vclr_command.append("-strand={}".format(strand))
+    if threshold is not None:
+        vclr_command.append("-t={}".format(threshold))
+    if read_score is not None:
+        vclr_command.append("-s={}".format(read_score))
+
+    vclr = sp.Popen(vclr_command, stdin=sp.PIPE, stdout=sp.PIPE)
+
     for l in probs:
         vclr.stdin.write(l)
     output = vclr.communicate()[0]
@@ -63,6 +72,10 @@ def main(args):
         parser.add_argument("-gen", action="store", dest="genomic", required=True)
         parser.add_argument("-N", action="store", dest="N", type=int, required=True)
         parser.add_argument("-i", action="store", dest="iter", type=int, required=True)
+
+        parser.add_argument("-t", action="store", dest="threshold", required=False, default=None)
+        parser.add_argument("-strand", action="store", dest="strand", required=False, default=None)
+        parser.add_argument("-s", action="store", dest="read_score", required=False, default=None)
         args = parser.parse_args()
         return args
     args = parse_args()
@@ -89,9 +102,16 @@ def main(args):
             break
         pcr_batch = pcr_alignments[block_start:block_end]
         gen_batch = gen_alignments[block_start:block_end]
-
-        pcr_false_positive, pcr_true_negative, pcr_coverage = variant_call_stats(parse_reads_probs(pcr_batch))
-        gen_true_positive, gen_false_negative, gen_coverage = variant_call_stats(parse_reads_probs(gen_batch))
+        pcr_probs = parse_reads_probs(pcr_batch)
+        gen_probs = parse_reads_probs(gen_batch)
+        pcr_false_positive, pcr_true_negative, pcr_coverage = variant_call_stats(probs=pcr_probs,
+                                                                                 strand=args.strand,
+                                                                                 threshold=args.threshold,
+                                                                                 read_score=args.read_score)
+        gen_true_positive, gen_false_negative, gen_coverage = variant_call_stats(probs=gen_probs,
+                                                                                 strand=args.strand,
+                                                                                 threshold=args.threshold,
+                                                                                 read_score=args.read_score)
 
         accuracy = (gen_true_positive + pcr_true_negative) / (pcr_false_positive + pcr_true_negative +
                                                               gen_true_positive + gen_false_negative)
