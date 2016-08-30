@@ -62,7 +62,7 @@ def main(args):
         parser.add_argument("-pcr", action="store", dest="pcr", required=True)
         parser.add_argument("-gen", action="store", dest="genomic", required=True)
         parser.add_argument("-N", action="store", dest="N", type=int, required=True)
-        parser.add_argument("-i", action="store", dest="iter", required=True)
+        parser.add_argument("-i", action="store", dest="iter", type=int, required=True)
         args = parser.parse_args()
         return args
     args = parse_args()
