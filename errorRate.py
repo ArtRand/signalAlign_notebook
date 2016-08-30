@@ -61,7 +61,7 @@ def main(args):
         parser = ArgumentParser(description=__doc__)
         parser.add_argument("-pcr", action="store", dest="pcr", required=True)
         parser.add_argument("-gen", action="store", dest="genomic", required=True)
-        parser.add_argument("-N", action="store", dest="N", required=True)
+        parser.add_argument("-N", action="store", dest="N", type=int, required=True)
         parser.add_argument("-i", action="store", dest="iter", required=True)
         args = parser.parse_args()
         return args
@@ -80,7 +80,7 @@ def main(args):
     else:
         limit = len(gen_alignments)
 
-    i = 1
+    i = 0
     block_size = args.N
     while i <= args.iter:
         block_start = i * block_size
