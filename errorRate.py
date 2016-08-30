@@ -27,9 +27,9 @@ def parse_reads_probs(alignment_files):
     return lines
 
 
-def variant_call_stats(probs):
+def variant_call_stats(probs, read_score=40):
     assert len(probs) > 0, "Probs length 0"
-    vclr = sp.Popen(["VClr", "-tool=methyl"], stdin=sp.PIPE, stdout=sp.PIPE)
+    vclr = sp.Popen(["VClr", "-tool=methyl", "-s={}".format(read_score)], stdin=sp.PIPE, stdout=sp.PIPE)
     for l in probs:
         vclr.stdin.write(l)
     output = vclr.communicate()[0]
