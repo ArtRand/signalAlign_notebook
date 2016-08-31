@@ -29,7 +29,7 @@ def main(args):
         parser.add_argument("-i", action="store", dest="iterations", type=int, required=True)
         parser.add_argument("-n", action="store", dest="n_test_alns", type=int, required=True)
         parser.add_argument("-x", action="store", dest="degenerate", required=True)
-        parser.add_argument("-j", action="store", dest="jobs", required=True)
+        parser.add_argument("-j", action="store", dest="jobs", type=int, required=True)
         parser.add_argument("-o", action="store", dest="outpath", required=True)
         args = parser.parse_args()
         return args
