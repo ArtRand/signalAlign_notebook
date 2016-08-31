@@ -18,7 +18,7 @@ def main(args):
         parser.add_argument("--pcr_train", action="store", dest="pcr_fofn_train", required=True)
         parser.add_argument("--gen_train", action="store", dest="genomic_fofn_train", required=True)
         parser.add_argument("--pcr_test", action="store", dest="pcr_fofn_test", required=True)
-        parser.add_argument("--gen_test", action="store", dest="genomic_fofn_train", required=True)
+        parser.add_argument("--gen_test", action="store", dest="genomic_fofn_test", required=True)
         parser.add_argument('--positions', action='append', dest='positions_file', required=True)
         parser.add_argument('--motif', action='append', dest='motif_file', required=True)
         parser.add_argument("-tH", action="store", dest="t_hdp", required=True)
