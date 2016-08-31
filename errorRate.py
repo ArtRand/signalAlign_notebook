@@ -117,7 +117,7 @@ def main(args):
         accuracy = (gen_true_positive + pcr_true_negative) / (pcr_false_positive + pcr_true_negative +
                                                               gen_true_positive + gen_false_negative)
 
-        print(accuracy, (np.mean([pcr_coverage, gen_coverage])))
+        print(accuracy, gen_false_negative, pcr_false_positive, (np.mean([pcr_coverage, gen_coverage])), sep="\t")
         i += 1
 
 
