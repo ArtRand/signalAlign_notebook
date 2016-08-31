@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""errorRate.py randomly selects alignments from two experiments and tests their accuracy at a given coverage
+"""ErrorRate.py randomly selects alignments from two experiments and tests their accuracy at a given coverage
 The input to this script is a directory of PCR generated alignments and a directory of genomic DNA generated
 alignments. The program then randomly selects a given number of alignments and calls VClr to make variant
 calls on the sites. The script then records the number of sites called as methyl/non-methyl and compares it
@@ -72,7 +72,6 @@ def main(args):
         parser.add_argument("-gen", action="store", dest="genomic", required=True)
         parser.add_argument("-N", action="store", dest="N", type=int, required=True)
         parser.add_argument("-i", action="store", dest="iter", type=int, required=True)
-
         parser.add_argument("-t", action="store", dest="threshold", required=False, default=None)
         parser.add_argument("-strand", action="store", dest="strand", required=False, default=None)
         parser.add_argument("-s", action="store", dest="read_score", required=False, default=None)
@@ -95,7 +94,7 @@ def main(args):
 
     i = 0
     block_size = args.N
-    while i <= args.iter:
+    while i < args.iter:
         block_start = i * block_size
         block_end = block_start + block_size
         if block_end >= limit:

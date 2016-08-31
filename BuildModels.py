@@ -503,8 +503,10 @@ def train_model_transitions(fasta, pcr_fofn, genomic_fofn, degenerate, jobs, pos
     models = [model_directory + "tempFiles_expectations/template_trained.hmm",
               model_directory + "tempFiles_expectations/complement_trained.hmm"]
     if t_hdp is not None and c_hdp is not None:
-        models.append(model_directory + "tempFiles_expectations/template.singleLevelPriorEcoli.nhdp")
-        models.append(model_directory + "tempFiles_expectations/complement.singleLevelPriorEcoli.nhdp")
+        #models.append(model_directory + "tempFiles_expectations/template.singleLevelPriorEcoli.nhdp")
+        #models.append(model_directory + "tempFiles_expectations/complement.singleLevelPriorEcoli.nhdp")
+        models.append(model_directory + "tempFiles_expectations/template.multisetPriorEcoli.nhdp")
+        models.append(model_directory + "tempFiles_expectations/complement.multisetPriorEcoli.nhdp")
     os.chdir(working_path)
     return models
 
@@ -589,8 +591,10 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
     c = PATH_TO_BINS + c
     os.system(c)
     os.chdir(working_path)
-    return [hdp_pipeline_dir + "template.singleLevelPriorEcoli.nhdp",
-            hdp_pipeline_dir + "complement.singleLevelPriorEcoli.nhdp"]
+    #return [hdp_pipeline_dir + "template.singleLevelPriorEcoli.nhdp",
+    #        hdp_pipeline_dir + "complement.singleLevelPriorEcoli.nhdp"]
+    return [hdp_pipeline_dir + "template.multisetPriorEcoli.nhdp",
+            hdp_pipeline_dir + "complement.multisetPriorEcoli.nhdp"]
 
 
 def HDP_EM(ref_fasta, pcr_fofn, gen_fofn, degenerate, jobs, positions_file, motif_file, n_assignment_alns,
