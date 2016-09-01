@@ -785,7 +785,7 @@ def main(args):
         build_alignment = make_build_alignment(assignments=master,
                                                degenerate=args.degenerate,
                                                kmer_length=kmer_length_from_model(models[0]),
-                                               ref_fasta=os.path.abspath(args.reference),
+                                               ref_fasta=reference_location,
                                                n_canonical_assignments=args.assignments,
                                                n_methyl_assignments=args.methyl_assignments,
                                                outfile=working_path + "/buildAlignment.tsv",
