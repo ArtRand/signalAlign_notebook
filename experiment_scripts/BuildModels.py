@@ -711,8 +711,11 @@ def main(args):
     else:
         HDP_type = "singleLevelPriorEcoli"
 
-    # make the positions and motif file
     working_path = os.path.abspath(args.outpath)
+
+    reference_location = os.path.abspath(args.reference)
+
+    # make the positions and motif file
     if args.positions_file is not None and args.motif_file is not None:
         assert len(args.positions_file) == 2 and len(args.motif_file) == 2, "need to give training and testing " \
                                                                             "positions/motif files"
@@ -744,7 +747,7 @@ def main(args):
                                                  split=args.split)
 
     # train the transitions
-    models = train_model_transitions(fasta=os.path.abspath(args.reference),
+    models = train_model_transitions(fasta=reference_location,
                                      pcr_fofn=pcr_fofns[0],
                                      genomic_fofn=gen_fofns[0],
                                      degenerate=args.degenerate,
@@ -757,7 +760,7 @@ def main(args):
                                      t_model=os.path.abspath(args.in_T_Hmm),
                                      c_model=os.path.abspath(args.in_C_Hmm))
     # do the initial alignments
-    assignment_dirs = run_guide_alignment(fasta=os.path.abspath(args.reference),
+    assignment_dirs = run_guide_alignment(fasta=reference_location,
                                           pcr_fofn=pcr_fofns[0],
                                           genomic_fofn=gen_fofns[0],
                                           jobs=args.jobs,
@@ -796,7 +799,7 @@ def main(args):
                      samples=args.samples)
 
     if args.HDP_EM is not None:
-        hdp_models = HDP_EM(ref_fasta=os.path.abspath(args.reference),
+        hdp_models = HDP_EM(ref_fasta=reference_location,
                             pcr_fofn=pcr_fofns[0],
                             gen_fofn=gen_fofns[0],
                             degenerate=args.degenerate,
@@ -819,7 +822,7 @@ def main(args):
                             hdp_type=HDP_type)
     else:
         # train HMM/HDP
-        hdp_models = train_model_transitions(fasta=os.path.abspath(args.reference),
+        hdp_models = train_model_transitions(fasta=reference_location,
                                              pcr_fofn=pcr_fofns[0],
                                              genomic_fofn=gen_fofns[0],
                                              degenerate=args.degenerate,
@@ -835,7 +838,7 @@ def main(args):
                                              t_model=os.path.abspath(args.in_T_Hmm),
                                              c_model=os.path.abspath(args.in_C_Hmm))
     # run methylation variant calling experiment
-    run_variant_calling_experiment(fasta=os.path.abspath(args.reference),
+    run_variant_calling_experiment(fasta=reference_location,
                                    pcr_fofn=pcr_fofns[1],
                                    genomic_fofn=gen_fofns[1],
                                    jobs=args.jobs,
