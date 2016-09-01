@@ -94,6 +94,7 @@ def main(args):
 
     i = 0
     block_size = args.N
+    print("accuracy\tsensitivity\tspecificity\tprecision\tfallout\tmiss_rate\tFDR\tmean_coverage\n")
     while i < args.iter:
         block_start = i * block_size
         block_end = block_start + block_size
