@@ -481,7 +481,7 @@ def make_master_assignment_table(assignment_directories):
 
 
 def train_model_transitions(fasta, pcr_fofn, genomic_fofn, degenerate, jobs, positions_file, iterations, batch_size,
-                            outpath, t_model, c_model, stateMachine="threeState", t_hdp=None, c_hdp=None,
+                            outpath, t_model, c_model, hdp_type, stateMachine="threeState", t_hdp=None, c_hdp=None,
                             em_iteration=""):
     working_path = os.path.abspath(outpath) + "/"
     model_directory = working_path + "{sm}_{it}".format(sm=stateMachine, it=em_iteration)
@@ -503,10 +503,8 @@ def train_model_transitions(fasta, pcr_fofn, genomic_fofn, degenerate, jobs, pos
     models = [model_directory + "tempFiles_expectations/template_trained.hmm",
               model_directory + "tempFiles_expectations/complement_trained.hmm"]
     if t_hdp is not None and c_hdp is not None:
-        #models.append(model_directory + "tempFiles_expectations/template.singleLevelPriorEcoli.nhdp")
-        #models.append(model_directory + "tempFiles_expectations/complement.singleLevelPriorEcoli.nhdp")
-        models.append(model_directory + "tempFiles_expectations/template.multisetPriorEcoli.nhdp")
-        models.append(model_directory + "tempFiles_expectations/complement.multisetPriorEcoli.nhdp")
+        models.append(model_directory + "tempFiles_expectations/template.{}.nhdp".format(hdp_type))
+        models.append(model_directory + "tempFiles_expectations/complement.{}.nhdp".format(hdp_type))
     os.chdir(working_path)
     return models
 
@@ -575,7 +573,8 @@ def make_bulk_build_alignment(assignments, degenerate, n_canonical_assignments, 
     return outfile
 
 
-def build_hdp(build_alignment_path, template_model, complement_model, outpath, samples=15000, em_iteration=""):
+def build_hdp(build_alignment_path, template_model, complement_model, outpath, hdp_type, samples=15000,
+              em_iteration=""):
     working_path = os.path.abspath(outpath) + "/"
     build_alignment = os.path.abspath(build_alignment_path)
     t_model = os.path.abspath(template_model)
@@ -591,15 +590,14 @@ def build_hdp(build_alignment_path, template_model, complement_model, outpath, s
     c = PATH_TO_BINS + c
     os.system(c)
     os.chdir(working_path)
-    #return [hdp_pipeline_dir + "template.singleLevelPriorEcoli.nhdp",
-    #        hdp_pipeline_dir + "complement.singleLevelPriorEcoli.nhdp"]
-    return [hdp_pipeline_dir + "template.multisetPriorEcoli.nhdp",
-            hdp_pipeline_dir + "complement.multisetPriorEcoli.nhdp"]
+
+    return [hdp_pipeline_dir + "template.{}.nhdp".format(hdp_type),
+            hdp_pipeline_dir + "complement.{}.nhdp".format(hdp_type)]
 
 
 def HDP_EM(ref_fasta, pcr_fofn, gen_fofn, degenerate, jobs, positions_file, motif_file, n_assignment_alns,
            n_canonical_assns, n_methyl_assns, iterations, batch_size, working_path, start_hdps, threshold,
-           start_temp_hmm, start_comp_hmm, n_iterations, gibbs_samples, bulk):
+           hdp_type, start_temp_hmm, start_comp_hmm, n_iterations, gibbs_samples, bulk):
     template_hdp = start_hdps[0]
     complement_hdp = start_hdps[1]
     template_hmm = start_temp_hmm
@@ -620,7 +618,8 @@ def HDP_EM(ref_fasta, pcr_fofn, gen_fofn, degenerate, jobs, positions_file, moti
                                              t_hdp=template_hdp,
                                              c_hdp=complement_hdp,
                                              t_model=template_hmm,
-                                             c_model=complement_hmm)
+                                             c_model=complement_hmm,
+                                             hdp_type=hdp_type)
         # next get assignments
         assignment_dirs = run_guide_alignment(fasta=ref_fasta,
                                               pcr_fofn=pcr_fofn,
@@ -663,6 +662,7 @@ def HDP_EM(ref_fasta, pcr_fofn, gen_fofn, degenerate, jobs, positions_file, moti
         new_hdps = build_hdp(build_alignment_path=build_alignment,
                              template_model=hdp_models[0],
                              complement_model=hdp_models[1],
+                             hdp_type=hdp_type,
                              outpath=working_path,
                              samples=gibbs_samples,
                              em_iteration="_{}".format(i))
@@ -685,6 +685,7 @@ def main(args):
         parser.add_argument('--positions', action='append', dest='positions_file', required=False, default=None)
         parser.add_argument('--motif', action='append', dest='motif_file', required=False, default=None)
         parser.add_argument('--bulk', action='store_true', dest='bulk', required=False, default=False)
+        parser.add_argument('--hdp_type', action='store', dest='hdp_type', required=False, default="multiset")
         parser.add_argument("-j", action="store", dest="jobs", required=False, default=4, type=int)
         parser.add_argument("-i", action="store", dest="iterations", required=False, type=int, default=20)
         parser.add_argument("-a", action="store", dest="batch", required=False, type=int, default=15000)
@@ -694,7 +695,7 @@ def main(args):
         parser.add_argument("-e", action="store", dest="n_test_alns", required=False, type=int, default=1000)
         parser.add_argument("-t", action="store", dest="assignment_threshold", required=False, type=float, default=0.8)
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
-        parser.add_argument("-hdp_em", action="store", dest="HDP_EM", required=False, type=int, default=None)
+        parser.add_argument("--hdp_em", action="store", dest="HDP_EM", required=False, type=int, default=None)
         parser.add_argument("--split", action="store", dest="split", required=False, type=float, default=0.5)
         args = parser.parse_args()
         return args
@@ -703,6 +704,12 @@ def main(args):
     print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
     args = parse_args()
+
+    # decide which type of HDP to carry through the pipeline
+    if args.hdp_type == "multiset":
+        HDP_type = "multisetPriorEcoli"
+    else:
+        HDP_type = "singleLevelPriorEcoli"
 
     # make the positions and motif file
     working_path = os.path.abspath(args.outpath)
@@ -746,6 +753,7 @@ def main(args):
                                      iterations=args.iterations,
                                      batch_size=args.batch,
                                      outpath=working_path,
+                                     hdp_type=HDP_type,
                                      t_model=os.path.abspath(args.in_T_Hmm),
                                      c_model=os.path.abspath(args.in_C_Hmm))
     # do the initial alignments
@@ -783,6 +791,7 @@ def main(args):
     hdps = build_hdp(build_alignment_path=build_alignment,
                      template_model=models[0],
                      complement_model=models[1],
+                     hdp_type=HDP_type,
                      outpath=working_path,
                      samples=args.samples)
 
@@ -806,7 +815,8 @@ def main(args):
                             start_comp_hmm=models[1],
                             n_iterations=args.HDP_EM,
                             gibbs_samples=args.samples,
-                            bulk=args.bulk)
+                            bulk=args.bulk,
+                            hdp_type=HDP_type)
     else:
         # train HMM/HDP
         hdp_models = train_model_transitions(fasta=os.path.abspath(args.reference),
@@ -821,6 +831,7 @@ def main(args):
                                              stateMachine="threeStateHdp",
                                              t_hdp=hdps[0],
                                              c_hdp=hdps[1],
+                                             hdp_type=HDP_type,
                                              t_model=os.path.abspath(args.in_T_Hmm),
                                              c_model=os.path.abspath(args.in_C_Hmm))
     # run methylation variant calling experiment
