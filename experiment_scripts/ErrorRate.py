@@ -71,7 +71,7 @@ def main(args):
         parser.add_argument("-pcr", action="store", dest="pcr", required=True)
         parser.add_argument("-gen", action="store", dest="genomic", required=True)
         parser.add_argument("-N", action="store", dest="N", type=int, required=True)
-        parser.add_argument("-i", action="store", dest="iter", type=int, required=True)
+        parser.add_argument("-i", action="store", dest="iter", type=int, required=False, default=None)
         parser.add_argument("-t", action="store", dest="threshold", required=False, default=None)
         parser.add_argument("-strand", action="store", dest="strand", required=False, default=None)
         parser.add_argument("-s", action="store", dest="read_score", required=False, default=None)
@@ -79,37 +79,71 @@ def main(args):
         return args
     args = parse_args()
 
-    # collect alignments from the PCR directory
-    pcr_alignments = [x for x in glob.glob(args.pcr)]
-    shuffle(pcr_alignments)
-
-    # collect alignments from genomic directory
-    gen_alignments = [x for x in glob.glob(args.genomic)]
-    shuffle(gen_alignments)
-
-    if len(gen_alignments) >= len(pcr_alignments):
-        limit = len(pcr_alignments)
-    else:
-        limit = len(gen_alignments)
-
-    i = 0
-    block_size = args.N
     print("accuracy\tsensitivity\tspecificity\tprecision\tfallout\tmiss_rate\tFDR\tmean_coverage")
-    while i < args.iter:
-        block_start = i * block_size
-        block_end = block_start + block_size
-        if block_end >= limit:
-            break
-        pcr_batch = pcr_alignments[block_start:block_end]
-        gen_batch = gen_alignments[block_start:block_end]
-        pcr_probs = parse_reads_probs(pcr_batch)
-        gen_probs = parse_reads_probs(gen_batch)
 
-        false_positive, true_negative, pcr_coverage = variant_call_stats(probs=pcr_probs,
+    if args.iter is not None:
+        i = 0
+        block_size = args.N
+
+        # collect alignments from the PCR directory
+        pcr_alignments = [x for x in glob.glob(args.pcr)]
+        shuffle(pcr_alignments)
+
+        # collect alignments from genomic directory
+        gen_alignments = [x for x in glob.glob(args.genomic)]
+        shuffle(gen_alignments)
+
+        if len(gen_alignments) >= len(pcr_alignments):
+            limit = len(pcr_alignments)
+        else:
+            limit = len(gen_alignments)
+
+        while i < args.iter:
+            block_start = i * block_size
+            block_end = block_start + block_size
+            if block_end >= limit:
+                break
+            pcr_batch = pcr_alignments[block_start:block_end]
+            gen_batch = gen_alignments[block_start:block_end]
+            pcr_probs = parse_reads_probs(pcr_batch)
+            gen_probs = parse_reads_probs(gen_batch)
+
+            false_positive, true_negative, pcr_coverage = variant_call_stats(probs=pcr_probs,
+                                                                             strand=args.strand,
+                                                                             threshold=args.threshold,
+                                                                             read_score=args.read_score)
+            true_positive, false_negative, gen_coverage = variant_call_stats(probs=gen_probs,
+                                                                             strand=args.strand,
+                                                                             threshold=args.threshold,
+                                                                             read_score=args.read_score)
+
+            accuracy = (true_positive + true_negative) / (false_positive + true_negative + true_positive + false_negative)
+
+            sensitivity = true_positive / (true_positive + false_negative)  # hit rate, recall
+
+            specificity = true_negative / (true_negative + false_positive)  # true negative rate
+
+            precision = true_positive / (true_positive + false_positive)    # positive predictive value
+
+            fall_out = false_positive / (false_positive + true_negative)    # false positive rate
+
+            miss_rate = false_negative / (true_positive + false_negative)   # false negative rate
+
+            fdr = false_positive / (true_positive + false_positive)         # false discovery rate
+
+            mean_cov = np.mean([pcr_coverage, gen_coverage])
+
+            print(accuracy, sensitivity, specificity, precision, fall_out, miss_rate, fdr, mean_cov, sep="\t", end="\n")
+            i += 1
+    else:
+        pcr_dat = parse_reads_probs([args.pcr])
+        genomic_dat = parse_reads_probs([args.genomic])
+        false_positive, true_negative, pcr_coverage = variant_call_stats(probs=pcr_dat,
                                                                          strand=args.strand,
                                                                          threshold=args.threshold,
                                                                          read_score=args.read_score)
-        true_positive, false_negative, gen_coverage = variant_call_stats(probs=gen_probs,
+
+        true_positive, false_negative, gen_coverage = variant_call_stats(probs=genomic_dat,
                                                                          strand=args.strand,
                                                                          threshold=args.threshold,
                                                                          read_score=args.read_score)
@@ -120,18 +154,17 @@ def main(args):
 
         specificity = true_negative / (true_negative + false_positive)  # true negative rate
 
-        precision = true_positive / (true_positive + false_positive)    # positive predictive value
+        precision = true_positive / (true_positive + false_positive)  # positive predictive value
 
-        fall_out = false_positive / (false_positive + true_negative)    # false positive rate
+        fall_out = false_positive / (false_positive + true_negative)  # false positive rate
 
-        miss_rate = false_negative / (true_positive + false_negative)   # false negative rate
+        miss_rate = false_negative / (true_positive + false_negative)  # false negative rate
 
-        fdr = false_positive / (true_positive + false_positive)         # false discovery rate
+        fdr = false_positive / (true_positive + false_positive)  # false discovery rate
 
         mean_cov = np.mean([pcr_coverage, gen_coverage])
 
         print(accuracy, sensitivity, specificity, precision, fall_out, miss_rate, fdr, mean_cov, sep="\t", end="\n")
-        i += 1
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
