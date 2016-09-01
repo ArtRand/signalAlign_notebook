@@ -13,7 +13,7 @@ from random import shuffle
 from commonFunctions import get_first_seq, make_motif_file, get_all_sequence_kmers, make_CCWGG_positions_file, \
     find_ccwgg_motifs
 
-PATH_TO_SIGNALALIGN = os.path.abspath("../signalAlign/")
+PATH_TO_SIGNALALIGN = os.path.abspath("../../signalAlign/")
 PATH_TO_BINS = PATH_TO_SIGNALALIGN + "/bin/"
 
 

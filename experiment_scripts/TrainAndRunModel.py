@@ -7,7 +7,7 @@ import os
 from argparse import ArgumentParser
 from BuildModels import train_model_transitions, run_variant_calling_experiment
 
-PATH_TO_SIGNALALIGN = os.path.abspath("../signalAlign/")
+PATH_TO_SIGNALALIGN = os.path.abspath("../../signalAlign/")
 PATH_TO_BINS = PATH_TO_SIGNALALIGN + "/bin/"
 
 

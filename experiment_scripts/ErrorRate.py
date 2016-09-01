@@ -104,21 +104,33 @@ def main(args):
         pcr_probs = parse_reads_probs(pcr_batch)
         gen_probs = parse_reads_probs(gen_batch)
 
-        pcr_false_positive, pcr_true_negative, pcr_coverage = variant_call_stats(probs=pcr_probs,
-                                                                                 strand=args.strand,
-                                                                                 threshold=args.threshold,
-                                                                                 read_score=args.read_score)
-        gen_true_positive, gen_false_negative, gen_coverage = variant_call_stats(probs=gen_probs,
-                                                                                 strand=args.strand,
-                                                                                 threshold=args.threshold,
-                                                                                 read_score=args.read_score)
+        false_positive, true_negative, pcr_coverage = variant_call_stats(probs=pcr_probs,
+                                                                         strand=args.strand,
+                                                                         threshold=args.threshold,
+                                                                         read_score=args.read_score)
+        true_positive, false_negative, gen_coverage = variant_call_stats(probs=gen_probs,
+                                                                         strand=args.strand,
+                                                                         threshold=args.threshold,
+                                                                         read_score=args.read_score)
 
-        accuracy = (gen_true_positive + pcr_true_negative) / (pcr_false_positive + pcr_true_negative +
-                                                              gen_true_positive + gen_false_negative)
+        accuracy = (true_positive + true_negative) / (false_positive + true_negative + true_positive + false_negative)
 
-        print(accuracy, gen_false_negative, pcr_false_positive, (np.mean([pcr_coverage, gen_coverage])), sep="\t")
+        sensitivity = true_positive / (true_positive + false_negative)  # hit rate, recall
+
+        specificity = true_negative / (true_negative + false_positive)  # true negative rate
+
+        precision = true_positive / (true_positive + false_positive)    # positive predictive value
+
+        fall_out = false_positive / (false_positive + true_negative)    # false positive rate
+
+        miss_rate = false_negative / (true_positive + false_negative)   # false negative rate
+
+        fdr = false_positive / (true_positive + false_positive)         # false discovery rate
+
+        mean_cov = np.mean([pcr_coverage, gen_coverage])
+
+        print(accuracy, sensitivity, specificity, precision, fall_out, miss_rate, fdr, mean_cov, sep="\t", end="\n")
         i += 1
-
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
