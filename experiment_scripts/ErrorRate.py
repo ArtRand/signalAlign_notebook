@@ -70,7 +70,7 @@ def main(args):
         parser = ArgumentParser(description=__doc__)
         parser.add_argument("-pcr", action="store", dest="pcr", required=True)
         parser.add_argument("-gen", action="store", dest="genomic", required=True)
-        parser.add_argument("-N", action="store", dest="N", type=int, required=True)
+        parser.add_argument("-N", action="store", dest="N", type=int, required=False, default=10)
         parser.add_argument("-i", action="store", dest="iter", type=int, required=False, default=None)
         parser.add_argument("-t", action="store", dest="threshold", required=False, default=None)
         parser.add_argument("-strand", action="store", dest="strand", required=False, default=None)
@@ -117,7 +117,8 @@ def main(args):
                                                                              threshold=args.threshold,
                                                                              read_score=args.read_score)
 
-            accuracy = (true_positive + true_negative) / (false_positive + true_negative + true_positive + false_negative)
+            accuracy = (true_positive + true_negative) / (false_positive + true_negative +
+                                                          true_positive + false_negative)
 
             sensitivity = true_positive / (true_positive + false_negative)  # hit rate, recall
 
