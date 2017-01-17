@@ -79,7 +79,7 @@ def main(args):
         return args
     args = parse_args()
 
-    print("accuracy\tsensitivity\tspecificity\tprecision\tfallout\tmiss_rate\tFDR\tmean_coverage")
+    print("accuracy\tsensitivity\tspecificity\tprecision\tfallout\tmiss_rate\tFDR\tNPV\tmean_coverage")
 
     if args.iter is not None:
         i = 0
@@ -132,9 +132,11 @@ def main(args):
 
             fdr = false_positive / (true_positive + false_positive)         # false discovery rate
 
+            npv = true_negative / (true_negative + false_negative)          # negative predictive value
+
             mean_cov = np.mean([pcr_coverage, gen_coverage])
 
-            print(accuracy, sensitivity, specificity, precision, fall_out, miss_rate, fdr, mean_cov, sep="\t", end="\n")
+            print(accuracy, sensitivity, specificity, precision, fall_out, miss_rate, fdr, npv, mean_cov, sep="\t", end="\n")
             i += 1
     else:
         pcr_dat = parse_reads_probs([args.pcr])
@@ -163,9 +165,12 @@ def main(args):
 
         fdr = false_positive / (true_positive + false_positive)  # false discovery rate
 
+        npv = true_negative / (true_negative + false_negative)          # negative predictive value
+
         mean_cov = np.mean([pcr_coverage, gen_coverage])
 
-        print(accuracy, sensitivity, specificity, precision, fall_out, miss_rate, fdr, mean_cov, sep="\t", end="\n")
+        print(accuracy, sensitivity, specificity, precision, fall_out, miss_rate, fdr, npv, mean_cov, sep="\t", end="\n")
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
