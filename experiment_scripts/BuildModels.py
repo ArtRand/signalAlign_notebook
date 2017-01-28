@@ -547,9 +547,9 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
 
 
 def make_bulk_build_alignment(assignments, degenerate, n_canonical_assignments, n_methyl_assignments, threshold,
-                              outfile):
+                              outfile, strands=["t", "c"]):
     def write_bulk_assignments(assignment_df, max_assignments):
-        for strand in ["t", "c"]:
+        for strand in strands:
             by_strand = assignment_df.ix[(assignment_df['strand'] == strand) & (assignment_df['prob'] >= threshold)]
             n = 0
             for i, r in by_strand.iterrows():
@@ -868,9 +868,3 @@ def main(args):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
-
-
-
-
-
-
