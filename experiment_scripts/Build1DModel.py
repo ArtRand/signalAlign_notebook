@@ -68,9 +68,9 @@ def main(args):
     grid_length   = 1800
     burn_in       = 32 * count_lines_in_build_alignment(out_build_alignment)
     out_hdp       = os.path.join(workdir, "template.singleLevelPrior.nhdp")
-    build_command = [binary,
+    build_command = "".join([binary,
                      "--verbose",
-                     "--oneD"
+                     "--oneD",
                      "-p %s" % hdp_type,
                      "-v %s" % out_hdp,
                      "-l %s" % out_build_alignment,
@@ -87,8 +87,8 @@ def main(args):
                      "-j 1",
                      "-y 1",
                      "-i 1",
-                     "-u 1"]
-    subprocess.check_call(build_command, stdout=sys.stdout, stderr=sys.stderr)
+                     "-u 1"])
+    subprocess.check_call(build_command.split(), stdout=sys.stdout, stderr=sys.stderr)
 
     sys.exit(0)
 
