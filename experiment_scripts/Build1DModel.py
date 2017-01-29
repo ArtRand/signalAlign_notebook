@@ -70,7 +70,7 @@ def main(args):
     out_hdp       = os.path.join(workdir, "template.singleLevelPrior.nhdp")
     build_command = [binary,
                      "--verbose",
-                     "-q",
+                     "--oneD"
                      "-p %s" % hdp_type,
                      "-v %s" % out_hdp,
                      "-l %s" % out_build_alignment,
@@ -81,7 +81,13 @@ def main(args):
                      "-s %s" % grid_start,
                      "-e %s" % grid_end,
                      "-k %s" % grid_length,
-                     "-T %s" % kmer_model]
+                     "-T %s" % kmer_model,
+                     "-g 1",
+                     "-r 1",
+                     "-j 1",
+                     "-y 1",
+                     "-i 1",
+                     "-u 1"]
     subprocess.check_call(build_command, stdout=sys.stdout, stderr=sys.stderr)
 
     sys.exit(0)
