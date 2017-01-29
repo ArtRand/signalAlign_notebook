@@ -37,7 +37,7 @@ def main(args):
         parser.add_argument("-d", action="store", dest="assignment_threshold", required=False, type=float, default=0.8)
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
         parser.add_argument('-t', action='store', type=int, default=100, dest='thinning')
-        
+
         return parser.parse_args()
 
     args = parse_args()
@@ -70,6 +70,7 @@ def main(args):
     out_hdp       = os.path.join(workdir, "template.singleLevelPrior.nhdp")
     build_command = [binary,
                      "--verbose",
+                     "-q",
                      "-p %s" % hdp_type,
                      "-v %s" % out_hdp,
                      "-l %s" % out_build_alignment,
@@ -79,9 +80,9 @@ def main(args):
                      "-t %s" % args.thinning,
                      "-s %s" % grid_start,
                      "-e %s" % grid_end,
-                     "-k %s" % grid_len,
+                     "-k %s" % grid_length,
                      "-T %s" % kmer_model]
-    subprocess.check_call(command, stdout=sys.stdout, stderr=sys.stderr)
+    subprocess.check_call(build_command, stdout=sys.stdout, stderr=sys.stderr)
 
     sys.exit(0)
 
