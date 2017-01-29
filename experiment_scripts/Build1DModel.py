@@ -68,26 +68,26 @@ def main(args):
     grid_length   = 1800
     burn_in       = 32 * count_lines_in_build_alignment(out_build_alignment)
     out_hdp       = os.path.join(workdir, "template.singleLevelPrior.nhdp")
-    build_command = "".join([binary,
-                     "--verbose",
-                     "--oneD",
-                     "-p %s" % hdp_type,
-                     "-v %s" % out_hdp,
-                     "-l %s" % out_build_alignment,
-                     "-a %s" % kmer_length_from_model(kmer_model),
-                     "-n %s" % args.samples,
-                     "-I %s" % burn_in,
-                     "-t %s" % args.thinning,
-                     "-s %s" % grid_start,
-                     "-e %s" % grid_end,
-                     "-k %s" % grid_length,
-                     "-T %s" % kmer_model,
-                     "-g 1",
-                     "-r 1",
-                     "-j 1",
-                     "-y 1",
-                     "-i 1",
-                     "-u 1"])
+    build_command = " ".join([binary,
+                    "--verbose",
+                    "--oneD",
+                    "-p %s" % hdp_type,
+                    "-v %s" % out_hdp,
+                    "-l %s" % out_build_alignment,
+                    "-a %s" % kmer_length_from_model(kmer_model),
+                    "-n %s" % args.samples,
+                    "-I %s" % burn_in,
+                    "-t %s" % args.thinning,
+                    "-s %s" % grid_start,
+                    "-e %s" % grid_end,
+                    "-k %s" % grid_length,
+                    "-T %s" % kmer_model,
+                    "-g 1",
+                    "-r 1",
+                    "-j 1",
+                    "-y 1",
+                    "-i 1",
+                    "-u 1"])
     subprocess.check_call(build_command.split(), stdout=sys.stdout, stderr=sys.stderr)
 
     sys.exit(0)
