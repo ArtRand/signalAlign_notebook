@@ -511,7 +511,7 @@ def train_model_transitions(fasta, pcr_fofn, genomic_fofn, degenerate, jobs, pos
 
 
 def write_kmers(assignments, threshold, max_assignments, kmer_list, entry_line, fH, strands=["t", "c"]):
-    for strand in ["t", "c"]:
+    for strand in strands:
         by_strand = assignments.ix[(assignments['strand'] == strand) & (assignments['prob'] >= threshold)]
         for k in kmer_list:
             kmer_assignments = by_strand.ix[by_strand['kmer'] == k]

@@ -19,6 +19,7 @@ from BuildModels import \
 PATH_TO_SIGNALALIGN = "../../signalAlign/bin"
 PATH_TO_5MER_MODEL  = "../../signalAlign/models/testModelR9p4_5mer_acegt_template.model"
 NUCLEOTIDES         = "ACGT"
+NUCLEOTIDES_METHYLC = "ACGTE"
 
 
 def getKmers(kmer_length):
@@ -59,16 +60,11 @@ def getCGMotifKmers(kmer_length=5):
     return mcg_kmers + mgc_kmers
 
 
-def make_cg_build_alignment(assignments, n_canonical_assignments, n_methyl_assignments, outfile,
-                            threshold=0.8, kmer_length=5):
-    canonical_kmers  = getKmers(kmer_length)
-    methylated_kmers = getCGMotifKmers(kmer_length)
+def make_cg_build_alignment(assignments, n_assignments, outfile, threshold=0.8, kmer_length=5):
+    kmers = ["".join(k) for k in product(NUCLEOTIDES_METHYLC, repeat=kmer_length)]
     fH = open(outfile, "w")
     strands = ["t"]
-    write_kmers(assignments, threshold, n_canonical_assignments, canonical_kmers, ENTRY_LINE, fH,
-                strands=strands)
-    write_kmers(assignments, threshold, n_methyl_assignments, methylated_kmers, ENTRY_LINE, fH,
-                strands=strands)
+    write_kmers(assignments, threshold, n_assignments, kmers, ENTRY_LINE, fH, strands=strands)
     fH.close()
 
 
