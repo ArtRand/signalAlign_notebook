@@ -105,8 +105,7 @@ def main(args):
         assert(os.path.exists(out_build_alignment))
     else:
         make_cg_build_alignment(assignments=assignments,
-                                n_canonical_assignments=args.assignments,
-                                n_methyl_assignments=args.methyl_assignments,
+                                n_assignments=args.assignments,
                                 outfile=out_build_alignment,
                                 threshold=args.assignment_threshold)
 
