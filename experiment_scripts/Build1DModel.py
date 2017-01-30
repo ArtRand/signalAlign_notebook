@@ -96,13 +96,20 @@ def main(args):
                                                                        C=args.assignments,
                                                                        t=args.assignment_threshold)
     out_build_alignment = os.path.join(workdir, out_aln_filename)
-    make_bulk_build_alignment(assignments, "cytosine2",
-                              n_canonical_assignments=args.assignments,
-                              n_methyl_assignments=args.methyl_assignments,
-                              threshold=args.assignment_threshold,
-                              outfile=out_build_alignment,
-                              strands=["t"])
-    assert(os.path.exists(out_build_alignment))
+    if args.bulk:
+        make_bulk_build_alignment(assignments, "cytosine2",
+                                  n_canonical_assignments=args.assignments,
+                                  n_methyl_assignments=args.methyl_assignments,
+                                  threshold=args.assignment_threshold,
+                                  outfile=out_build_alignment,
+                                  strands=["t"])
+        assert(os.path.exists(out_build_alignment))
+    else:
+        make_cg_build_alignment(assignments=assignments,
+                                n_canonical_assignments=args.assignments,
+                                n_methyl_assignments=args.methyl_assignments,
+                                outfile=out_build_alignment,
+                                threshold=args.assignment_threshold)
 
     # routines to run the HDP builder
     binary        = os.path.join(os.path.abspath(PATH_TO_SIGNALALIGN), "buildHdpUtil")
