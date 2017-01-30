@@ -62,7 +62,7 @@ def getCGMotifKmers(kmer_length=5):
 def make_cg_build_alignment(assignments, n_canonical_assignments, n_methyl_assignments, outfile,
                             threshold=0.8, kmer_length=5):
     canonical_kmers  = getKmers(kmer_length)
-    methylated_kmers = getCGMotifKmers(kmer_length())
+    methylated_kmers = getCGMotifKmers(kmer_length)
     fH = open(outfile, "w")
     write_kmers(assignments, threshold, n_canonical_assignments, canonical_kmers, ENTRY_LINE, fH)
     write_kmers(assignments, threshold, n_methyl_assignments, methylated_kmers, ENTRY_LINE, fH)
