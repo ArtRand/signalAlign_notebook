@@ -15,6 +15,7 @@ from commonFunctions import get_first_seq, make_motif_file, get_all_sequence_kme
 
 PATH_TO_SIGNALALIGN = os.path.abspath("../../signalAlign/")
 PATH_TO_BINS = PATH_TO_SIGNALALIGN + "/bin/"
+ENTRY_LINE = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
 
 
 def train_test_split_fofn(pcr_reads_dir, genomic_reads_dir, working_directory, split=0.5):
@@ -509,27 +510,29 @@ def train_model_transitions(fasta, pcr_fofn, genomic_fofn, degenerate, jobs, pos
     return models
 
 
+def write_kmers(assignments, threshold, max_assignments, kmer_list, entry_line, fH, strands=["t", "c"]):
+    for strand in ["t", "c"]:
+        by_strand = assignments.ix[(assignments['strand'] == strand) & (assignments['prob'] >= threshold)]
+        for k in kmer_list:
+            kmer_assignments = by_strand.ix[by_strand['kmer'] == k]
+            if kmer_assignments.empty:
+                print("missing kmer {}, continuing".format(k))
+                continue
+            kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)
+            n = 0
+            for _, r in kmer_assignments.iterrows():
+                fH.write(
+                    entry_line.format(strand=r['strand'], kmer=r['kmer'], event=r['level_mean'], prob=r['prob']))
+                n += 1
+                if n >= max_assignments:
+                    break
+            if n < max_assignments:
+                print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
+                      "".format(max=max_assignments, kmer=k, found=n))
+
+
 def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_canonical_assignments,
                          n_methyl_assignments, outfile, threshold):
-    def write_kmers(max_assignments, kmer_list):
-        for strand in ["t", "c"]:
-            by_strand = assignments.ix[(assignments['strand'] == strand) & (assignments['prob'] >= threshold)]
-            for k in kmer_list:
-                kmer_assignments = by_strand.ix[by_strand['kmer'] == k]
-                if kmer_assignments.empty:
-                    print("missing kmer {}, continuing".format(k))
-                    continue
-                kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)
-                n = 0
-                for _, r in kmer_assignments.iterrows():
-                    fH.write(
-                        entry_line.format(strand=r['strand'], kmer=r['kmer'], event=r['level_mean'], prob=r['prob']))
-                    n += 1
-                    if n >= max_assignments:
-                        break
-                if n < max_assignments:
-                    print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
-                          "".format(max=max_assignments, kmer=k, found=n))
     seq = get_first_seq(ref_fasta)
     sequence_kmers = get_all_sequence_kmers(seq, kmer_length).keys()
     if degenerate == "adenosine":
@@ -539,9 +542,8 @@ def make_build_alignment(assignments, degenerate, kmer_length, ref_fasta, n_cano
         methyl_kmers = list(ccwgg_kmers(sequence_kmers=sequence_kmers, kmer_length=kmer_length))
         methyl_kmers += list(ggwcc_kmers(sequence_kmers=sequence_kmers, kmer_length=kmer_length))
     fH = open(outfile, "w")
-    entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
-    write_kmers(n_canonical_assignments, sequence_kmers)
-    write_kmers(n_methyl_assignments, methyl_kmers)
+    write_kmers(assignments, threshold, n_canonical_assignments, sequence_kmers, ENTRY_LINE, fH)
+    write_kmers(assignments, threshold, n_methyl_assignments, methyl_kmers, ENTRY_LINE, fH)
     fH.close()
     return outfile
 

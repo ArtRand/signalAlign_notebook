@@ -5,15 +5,24 @@ HdpBuildUtil and runs it"""
 from __future__ import print_function
 import sys
 import os
+import re
 import subprocess
+from itertools import product, izip
 from argparse import ArgumentParser
 from BuildModels import \
     make_master_assignment_table,\
     make_bulk_build_alignment,\
-    kmer_length_from_model
+    kmer_length_from_model,\
+    write_kmers,\
+    ENTRY_LINE
 
 PATH_TO_SIGNALALIGN = "../../signalAlign/bin"
 PATH_TO_5MER_MODEL  = "../../signalAlign/models/testModelR9p4_5mer_acegt_template.model"
+NUCLEOTIDES         = "ACGT"
+
+
+def getKmers(kmer_length):
+    return ["".join(k) for k in product(NUCLEOTIDES, repeat=kmer_length)]
 
 
 def count_lines_in_build_alignment(build_alignment_path):
@@ -22,6 +31,42 @@ def count_lines_in_build_alignment(build_alignment_path):
         for line in fH.xreadlines():
             count += 1
     return count
+
+
+def getCGMotifKmers(kmer_length=5):
+    def find_CGs(k):
+        return [m.start() for m in re.finditer("CG", k)]
+
+    def find_GCs(k):
+        return [m.start() + 1 for m in re.finditer("GC", k)]
+
+    def methylate_kmers(kmers, positions, methyl="E"):
+        for kmer, pos in izip(kmers, positions):
+            l_kmer = list(kmer)
+            for p in pos:
+                l_kmer[p] = methyl
+            yield ''.join(l_kmer)
+
+    # handle CG containing kmers
+    kmers     = getKmers(kmer_length)
+    cg_kmers  = [k for k in kmers if "CG" in k]
+    CGs       = [find_CGs(k) for k in cg_kmers]
+    mcg_kmers = [k for k in methylate_kmers(cg_kmers, CGs)]
+    # handle the complement (GC) kmers
+    gc_kmers  = [k for k in kmers if "GC" in k]
+    GCs       = [find_GCs(k) for k in gc_kmers]
+    mgc_kmers = [k for k in methylate_kmers(gc_kmers, GCs)]
+    return mcg_kmers + mgc_kmers
+
+
+def make_cg_build_alignment(assignments, n_canonical_assignments, n_methyl_assignments, outfile,
+                            threshold=0.8, kmer_length=5):
+    canonical_kmers  = getKmers(kmer_length)
+    methylated_kmers = getCGMotifKmers(kmer_length())
+    fH = open(outfile, "w")
+    write_kmers(assignments, threshold, n_canonical_assignments, canonical_kmers, ENTRY_LINE, fH)
+    write_kmers(assignments, threshold, n_methyl_assignments, methylated_kmers, ENTRY_LINE, fH)
+    fH.close()
 
 
 def main(args):
@@ -69,25 +114,25 @@ def main(args):
     burn_in       = 32 * count_lines_in_build_alignment(out_build_alignment)
     out_hdp       = os.path.join(workdir, "template.singleLevelPrior.nhdp")
     build_command = " ".join([binary,
-                    "--verbose",
-                    "--oneD",
-                    "-p %s" % hdp_type,
-                    "-v %s" % out_hdp,
-                    "-l %s" % out_build_alignment,
-                    "-a %s" % kmer_length_from_model(kmer_model),
-                    "-n %s" % args.samples,
-                    "-I %s" % burn_in,
-                    "-t %s" % args.thinning,
-                    "-s %s" % grid_start,
-                    "-e %s" % grid_end,
-                    "-k %s" % grid_length,
-                    "-T %s" % kmer_model,
-                    "-g 1",
-                    "-r 1",
-                    "-j 1",
-                    "-y 1",
-                    "-i 1",
-                    "-u 1"])
+                              "--verbose",
+                              "--oneD",
+                              "-p %s" % hdp_type,
+                              "-v %s" % out_hdp,
+                              "-l %s" % out_build_alignment,
+                              "-a %s" % kmer_length_from_model(kmer_model),
+                              "-n %s" % args.samples,
+                              "-I %s" % burn_in,
+                              "-t %s" % args.thinning,
+                              "-s %s" % grid_start,
+                              "-e %s" % grid_end,
+                              "-k %s" % grid_length,
+                              "-T %s" % kmer_model,
+                              "-g 1",
+                              "-r 1",
+                              "-j 1",
+                              "-y 1",
+                              "-i 1",
+                              "-u 1"])
     subprocess.check_call(build_command.split(), stdout=sys.stdout, stderr=sys.stderr)
 
     sys.exit(0)
