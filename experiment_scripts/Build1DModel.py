@@ -76,9 +76,9 @@ def main(args):
         parser.add_argument("-gen", action="store", dest="gen", required=True)
         parser.add_argument("-o", action="store", dest="out_dir", required=True)
 
+        parser.add_argument("--bulk", action="store_true", dest="bulk", required=False, default=False)
         parser.add_argument("-s", action="store", dest="assignments", required=False, type=int, default=30)
-        parser.add_argument("-c", action="store", dest="methyl_assignments", required=False,
-                            type=int, default=200)
+        parser.add_argument("-c", action="store", dest="methyl_assignments", required=False, type=int, default=200)
         parser.add_argument("-d", action="store", dest="assignment_threshold", required=False, type=float, default=0.8)
         parser.add_argument("-g", action="store", dest="samples", required=False, type=int, default=15000)
         parser.add_argument('-t', action='store', type=int, default=100, dest='thinning')
